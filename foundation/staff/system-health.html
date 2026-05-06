@@ -1,53 +1,210 @@
-﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Foundation School â€” System Health</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>
-:root{--navy:#4C2A92;--navy-d:#3b2080;--gold:#F4BE41;--cream:#F4EFE3;--bg:#f5f3fb;--border:#e2ddf0;--text:#1a1230;--muted:#6b7280;--success:#166534;--success-bg:#dcfce7;--danger:#991b1b;--danger-bg:#fee2e2;--warn:#92400e;--warn-bg:#fef3c7;--info:#1e40af;--info-bg:#dbeafe}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px}header{background:var(--navy);color:white;box-shadow:0 2px 8px rgba(0,0,0,.18)}.header-inner{max-width:1180px;margin:0 auto;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:12px}.logo{width:38px;height:38px;border-radius:10px;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:900}.brand h1{font-size:17px;margin:0}.brand p{margin:2px 0 0;opacity:.75;font-size:12px}main{max-width:1180px;margin:0 auto;padding:28px 24px 60px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.card{background:white;border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:0 8px 28px rgba(76,42,146,.06)}.card h2{font-size:16px;color:var(--navy);margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:#f8f6ff;border:1px solid var(--border);border-radius:14px;padding:18px}.metric strong{display:block;font-size:28px;color:var(--navy)}.metric span{font-size:12px;color:var(--muted)}button,.btn{border:0;border-radius:9px;padding:10px 15px;font-weight:700;cursor:pointer;background:var(--navy);color:white;text-decoration:none;display:inline-block}button.secondary{background:white;color:var(--text);border:1px solid var(--border)}button.danger{background:var(--danger-bg);color:var(--danger);border:1px solid #fca5a5}button.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #fcd34d}button:disabled{opacity:.6;cursor:not-allowed}input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;background:white}.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;background:#f8f6ff;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}td{border-top:1px solid var(--border);padding:10px 12px;vertical-align:top}tr:hover td{background:#faf9ff}.badge{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}.ok{background:var(--success-bg);color:var(--success)}.bad{background:var(--danger-bg);color:var(--danger)}.wait{background:var(--warn-bg);color:var(--warn)}.info{background:var(--info-bg);color:var(--info)}.muted{color:var(--muted)}.error{background:var(--danger-bg);border:1px solid #fca5a5;color:var(--danger);padding:12px;border-radius:10px;margin:10px 0}.success{background:var(--success-bg);border:1px solid #86efac;color:var(--success);padding:12px;border-radius:10px;margin:10px 0}.small{font-size:12px;color:var(--muted)}pre{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;padding:14px;border-radius:12px;max-height:360px;overflow:auto}.actions{display:flex;gap:7px;flex-wrap:wrap}.hidden{display:none!important}
-</style>  <link rel="stylesheet" href="../ui/premium-theme.css" />
-</head><body><header><div class="header-inner"><div class="brand"><div class="logo">FS</div><div><h1>Foundation School â€” System Health</h1><p>Read-only operational safety checks</p></div></div><div class="actions"><a class="btn" href="admin-portal.html">Admin Portal</a><button class="secondary" onclick="signOut()">Sign Out</button></div></div></header><main><div class="toolbar"><button onclick="loadHealth()">Refresh Health</button></div><section class="card"><h2>System Summary</h2><div id="summary" class="grid"></div></section><section class="card"><h2>Table Checks</h2><div id="checks"></div></section><section class="card"><h2>Recent Failures</h2><div id="failures"></div></section></main><script>
-const SUPABASE_URL = (window.FS_CONFIG && window.FS_CONFIG.SUPABASE_URL) || '';
-const SUPABASE_ANON_KEY = (window.FS_CONFIG && window.FS_CONFIG.SUPABASE_ANON_KEY) || '';
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const $ = id => document.getElementById(id);
-function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function fmt(v){if(!v)return 'â€”'; try{return new Date(v).toLocaleString()}catch{return v}}
-function dateOnly(v){if(!v)return 'â€”'; return String(v).slice(0,10)}
-function badge(s){const x=String(s||'').toLowerCase(); const cls=x.includes('fail')||x.includes('error')?'bad':x.includes('pending')||x.includes('open')||x.includes('draft')?'wait':x.includes('sent')||x.includes('active')||x.includes('complete')||x==='true'?'ok':'info'; return `<span class="badge ${cls}">${esc(s??'â€”')}</span>`}
-async function requireAuth(){ const {data}=await db.auth.getSession(); if(!data.session){ return null } return data.session.user }
-async function signOut(){ await db.auth.signOut(); location.href='login.html' }
-function rowsToTable(headers, rows){return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="${headers.length}" class="muted">No records found.</td></tr>`}</tbody></table></div>`}
-function showErr(id,e){$(id).innerHTML=`<div class="error">${esc(e.message||e)}</div>`}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foundation School - System Health</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <style>
+    body { font-family: "Manrope", system-ui, sans-serif; }
+    .hero-title { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.2rem); }
+    .hero-sub { margin-top: 6px; }
+    .checks { display: grid; gap: 10px; }
+    .check { display: flex; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+    .check strong { font-size: 13px; }
+    .status { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); }
+    .status.ok { background: var(--success-soft); color: #1b6b3d; }
+    .status.warn { background: #fff4db; color: #8a5600; }
+    .status.bad { background: var(--danger-soft); color: #a33131; }
+    .state { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="fs-page">
+    <section class="hero">
+      <h1 class="hero-title">System Health</h1>
+      <p class="hero-sub">Runtime checks for Supabase access, queue pressure, and delivery risk.</p>
+    </section>
 
+    <section class="card">
+      <div class="fs-row" style="margin-bottom:10px;">
+        <strong>Health Snapshot</strong>
+        <span class="spacer"></span>
+        <button id="refreshBtn" class="btn primary">Refresh</button>
+      </div>
+      <div id="checks" class="checks"></div>
+      <div id="checksState" class="state">Running checks...</div>
+    </section>
 
-const checks = [
-  ['batches','batch_id'],
-  ['fellowship_map','fellowship_code'],
-  ['class_options','class_option_id'],
-  ['applicants','id'],
-  ['students','student_id'],
-  ['teachers','teacher_id'],
-  ['email_queue','id'],
-  ['error_submissions','id'],
-  ['audit_logs','id']
-];
-async function count(table, filter){let q=db.from(table).select('*',{count:'exact',head:true}); if(filter) q=filter(q); const {count,error}=await q; if(error) throw error; return count||0}
-async function loadHealth(){
- const summary=$('summary'), checksEl=$('checks'), failures=$('failures'); summary.innerHTML='Loadingâ€¦'; checksEl.innerHTML='Loadingâ€¦'; failures.innerHTML='Loadingâ€¦';
- try{
-  const [batches,open,active,applicants,students,pendingEmail,failedEmail,errors]=await Promise.all([
-    count('batches'), count('batches',q=>q.eq('registration_open',true)), count('batches',q=>q.eq('active',true)), count('applicants'), count('students'), count('email_queue',q=>q.eq('status','Pending')), count('email_queue',q=>q.eq('status','Failed')), count('error_submissions',q=>q.eq('resolved',false))
-  ]);
-  summary.innerHTML=[['Batches',batches],['Registration Open',open],['Active Batches',active],['Applicants',applicants],['Students',students],['Pending Emails',pendingEmail],['Failed Emails',failedEmail],['Unresolved Errors',errors]].map(([l,v])=>`<div class="metric"><strong>${esc(v)}</strong><span>${esc(l)}</span></div>`).join('');
-  const checkRows=[]; for(const [t] of checks){try{const c=await count(t); checkRows.push(`<tr><td>${esc(t)}</td><td>${badge('OK')}</td><td>${c}</td></tr>`)}catch(e){checkRows.push(`<tr><td>${esc(t)}</td><td>${badge('ERROR')}</td><td>${esc(e.message)}</td></tr>`)}}
-  checksEl.innerHTML=rowsToTable(['Table','Status','Count / Error'],checkRows);
-  const {data:ef}=await db.from('error_submissions').select('id,source_form,error_message,created_at').eq('resolved',false).order('created_at',{ascending:false}).limit(10);
-  const {data:mail}=await db.from('email_queue').select('id,recipient_email,status,error_message,created_at').eq('status','Failed').order('created_at',{ascending:false}).limit(10);
-  failures.innerHTML='<h3>Unresolved Form Errors</h3>'+rowsToTable(['Created','Source','Error'],(ef||[]).map(r=>`<tr><td>${fmt(r.created_at)}</td><td>${esc(r.source_form)}</td><td>${esc(r.error_message)}</td></tr>`))+'<h3 style="margin-top:20px">Failed Emails</h3>'+rowsToTable(['Created','Recipient','Error'],(mail||[]).map(r=>`<tr><td>${fmt(r.created_at)}</td><td>${esc(r.recipient_email)}</td><td>${esc(r.error_message)}</td></tr>`));
- }catch(e){showErr('summary',e); checksEl.innerHTML=''; failures.innerHTML=''}
-}
-loadHealth();
-</script>  <script src="../ui/premium-shell.js"></script>
-</body></html>
+    <section class="card">
+      <h3 style="margin-top:0;">Queue Counters</h3>
+      <div id="stats" class="stats"></div>
+      <div id="statsState" class="state">Loading queue counters...</div>
+    </section>
 
+    <section class="card">
+      <h3 style="margin-top:0;">Migration Notes</h3>
+      <ul id="migrationNotes" class="muted" style="margin:0 0 0 18px;"></ul>
+    </section>
+  </main>
 
+  <script src="../js/config.js"></script>
+  <script src="../js/admin-shell.js"></script>
+  <script type="module">
+    import { supabase, getCurrentProfile } from "../auth/auth-client.js";
 
+    const roleAllow = new Set(["admin", "superadmin", "subgroup_admin", "pastor"]);
+    const missingTables = new Set();
+    const $ = (id) => document.getElementById(id);
 
+    const isMissingTable = (error) => {
+      const msg = String(error?.message || "").toLowerCase();
+      return error?.code === "42P01" || msg.includes("does not exist") || msg.includes("relation");
+    };
 
+    function setState(id, msg) {
+      $(id).textContent = msg;
+      $(id).classList.remove("hidden");
+    }
 
+    function clearState(id) {
+      $(id).classList.add("hidden");
+    }
+
+    function checkRow(name, status, detail) {
+      return `
+        <article class="check">
+          <div>
+            <strong>${name}</strong>
+            <div class="muted">${detail}</div>
+          </div>
+          <span class="status ${status}">${status.toUpperCase()}</span>
+        </article>
+      `;
+    }
+
+    async function ensureAccess() {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        window.location.href = "login.html";
+        return null;
+      }
+      const profile = await getCurrentProfile();
+      if (!profile || !roleAllow.has(profile.role)) {
+        setState("checksState", "Access denied for this account.");
+        return null;
+      }
+      return profile;
+    }
+
+    async function safeCount(table, apply) {
+      let query = supabase.from(table).select("*", { count: "exact", head: true });
+      if (typeof apply === "function") query = apply(query);
+      const { count, error } = await query;
+      if (error) {
+        if (isMissingTable(error)) {
+          missingTables.add(table);
+          return 0;
+        }
+        throw error;
+      }
+      return count || 0;
+    }
+
+    async function healthChecks() {
+      setState("checksState", "Running checks...");
+      missingTables.clear();
+      const rows = [];
+
+      try {
+        const probe = await supabase.from("batches").select("batch_id", { head: true, count: "exact" }).limit(1);
+        if (probe.error) {
+          if (isMissingTable(probe.error)) missingTables.add("batches");
+          rows.push(checkRow("Supabase Connection", "bad", probe.error.message));
+        } else {
+          rows.push(checkRow("Supabase Connection", "ok", "Database reachable via anon session."));
+        }
+      } catch (error) {
+        rows.push(checkRow("Supabase Connection", "bad", error.message));
+      }
+
+      const session = await supabase.auth.getSession();
+      rows.push(checkRow("Auth Session", session.data?.session ? "ok" : "warn", session.data?.session ? "Active session found." : "No active session detected."));
+
+      try {
+        const rlsProbe = await supabase.from("profiles").select("user_id").limit(1);
+        if (rlsProbe.error) {
+          rows.push(checkRow("RLS Visibility", "warn", rlsProbe.error.message));
+        } else {
+          rows.push(checkRow("RLS Visibility", "ok", "Read probe succeeded for profiles."));
+        }
+      } catch (error) {
+        rows.push(checkRow("RLS Visibility", "warn", error.message));
+      }
+
+      rows.push(checkRow("Edge Function: registration-processor", "warn", "Placeholder check. Add function heartbeat table for live probe."));
+      rows.push(checkRow("Edge Function: sender-worker", "warn", "Placeholder check. Add worker heartbeat table for live probe."));
+
+      $("checks").innerHTML = rows.join("");
+      clearState("checksState");
+    }
+
+    async function loadStats() {
+      setState("statsState", "Loading queue counters...");
+      const queuedEmails = await safeCount("email_queue", (q) => q.in("status", ["Pending", "pending", "queued", "QUEUED"]));
+      const failedSyncs = await safeCount("failed_syncs", (q) => q.in("status", ["failed", "error", "FAILED", "ERROR"]));
+      const activeBatches = await safeCount("batches", (q) => q.eq("active", true));
+
+      $("stats").innerHTML = [
+        { label: "Queued Emails", value: queuedEmails },
+        { label: "Failed Sync Count", value: failedSyncs },
+        { label: "Active Batch Count", value: activeBatches },
+      ].map((item) => `
+        <article class="stat">
+          <div class="stat-value">${item.value}</div>
+          <div class="stat-label">${item.label}</div>
+        </article>
+      `).join("");
+
+      clearState("statsState");
+    }
+
+    function renderMigrationNotes() {
+      const items = [...missingTables].map((t) => `Missing required table for health checks: ${t}`);
+      $("migrationNotes").innerHTML = items.length
+        ? items.map((i) => `<li>${i}</li>`).join("")
+        : "<li>No missing-table migrations detected for this view.</li>";
+    }
+
+    async function refresh() {
+      await healthChecks();
+      await loadStats();
+      renderMigrationNotes();
+    }
+
+    async function init() {
+      const profile = await ensureAccess();
+      if (!profile) return;
+
+      window.FSAdminShell?.mount({
+        active: "health",
+        title: "Foundation School Admin",
+        profileName: profile.full_name || profile.email || "Admin",
+        role: profile.role,
+        breadcrumbs: [{ label: "Admin", href: "admin-dashboard.html" }, "System Health"],
+      });
+
+      $("refreshBtn").addEventListener("click", refresh);
+      await refresh();
+    }
+
+    init();
+  </script>
+</body>
+</html>

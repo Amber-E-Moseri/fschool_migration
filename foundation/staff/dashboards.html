@@ -1,28 +1,242 @@
-﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Foundation School â€” Dashboards</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>
-:root{--navy:#4C2A92;--navy-d:#3b2080;--gold:#F4BE41;--cream:#F4EFE3;--bg:#f5f3fb;--border:#e2ddf0;--text:#1a1230;--muted:#6b7280;--success:#166534;--success-bg:#dcfce7;--danger:#991b1b;--danger-bg:#fee2e2;--warn:#92400e;--warn-bg:#fef3c7;--info:#1e40af;--info-bg:#dbeafe}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px}header{background:var(--navy);color:white;box-shadow:0 2px 8px rgba(0,0,0,.18)}.header-inner{max-width:1180px;margin:0 auto;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:12px}.logo{width:38px;height:38px;border-radius:10px;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:900}.brand h1{font-size:17px;margin:0}.brand p{margin:2px 0 0;opacity:.75;font-size:12px}main{max-width:1180px;margin:0 auto;padding:28px 24px 60px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.card{background:white;border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:0 8px 28px rgba(76,42,146,.06)}.card h2{font-size:16px;color:var(--navy);margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.metric{background:#f8f6ff;border:1px solid var(--border);border-radius:14px;padding:18px}.metric strong{display:block;font-size:28px;color:var(--navy)}.metric span{font-size:12px;color:var(--muted)}button,.btn{border:0;border-radius:9px;padding:10px 15px;font-weight:700;cursor:pointer;background:var(--navy);color:white;text-decoration:none;display:inline-block}button.secondary{background:white;color:var(--text);border:1px solid var(--border)}button.danger{background:var(--danger-bg);color:var(--danger);border:1px solid #fca5a5}button.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #fcd34d}button:disabled{opacity:.6;cursor:not-allowed}input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;background:white}.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;background:#f8f6ff;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}td{border-top:1px solid var(--border);padding:10px 12px;vertical-align:top}tr:hover td{background:#faf9ff}.badge{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}.ok{background:var(--success-bg);color:var(--success)}.bad{background:var(--danger-bg);color:var(--danger)}.wait{background:var(--warn-bg);color:var(--warn)}.info{background:var(--info-bg);color:var(--info)}.muted{color:var(--muted)}.error{background:var(--danger-bg);border:1px solid #fca5a5;color:var(--danger);padding:12px;border-radius:10px;margin:10px 0}.success{background:var(--success-bg);border:1px solid #86efac;color:var(--success);padding:12px;border-radius:10px;margin:10px 0}.small{font-size:12px;color:var(--muted)}pre{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;padding:14px;border-radius:12px;max-height:360px;overflow:auto}.actions{display:flex;gap:7px;flex-wrap:wrap}.hidden{display:none!important}
-</style>  <link rel="stylesheet" href="../ui/premium-theme.css" />
-</head><body><header><div class="header-inner"><div class="brand"><div class="logo">FS</div><div><h1>Foundation School â€” Dashboards</h1><p>Batch-level enrollment, class and Moodle visibility</p></div></div><div class="actions"><a class="btn" href="admin-portal.html">Admin Portal</a><button class="secondary" onclick="signOut()">Sign Out</button></div></div></header><main><div class="toolbar"><select id="batch"></select><button onclick="loadDash()">Refresh Dashboard</button></div><section class="card"><h2>Batch Overview</h2><div id="overview" class="grid"></div></section><section class="card"><h2>Enrollment by Group</h2><div id="groups"></div></section><section class="card"><h2>Attendance Progress</h2><div id="attendance"></div></section><section class="card"><h2>Moodle Progress</h2><div id="moodle"></div></section></main><script>
-const SUPABASE_URL = (window.FS_CONFIG && window.FS_CONFIG.SUPABASE_URL) || '';
-const SUPABASE_ANON_KEY = (window.FS_CONFIG && window.FS_CONFIG.SUPABASE_ANON_KEY) || '';
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const $ = id => document.getElementById(id);
-function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function fmt(v){if(!v)return 'â€”'; try{return new Date(v).toLocaleString()}catch{return v}}
-function dateOnly(v){if(!v)return 'â€”'; return String(v).slice(0,10)}
-function badge(s){const x=String(s||'').toLowerCase(); const cls=x.includes('fail')||x.includes('error')?'bad':x.includes('pending')||x.includes('open')||x.includes('draft')?'wait':x.includes('sent')||x.includes('active')||x.includes('complete')||x==='true'?'ok':'info'; return `<span class="badge ${cls}">${esc(s??'â€”')}</span>`}
-async function requireAuth(){ const {data}=await db.auth.getSession(); if(!data.session){ return null } return data.session.user }
-async function signOut(){ await db.auth.signOut(); location.href='login.html' }
-function rowsToTable(headers, rows){return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="${headers.length}" class="muted">No records found.</td></tr>`}</tbody></table></div>`}
-function showErr(id,e){$(id).innerHTML=`<div class="error">${esc(e.message||e)}</div>`}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foundation School - Dashboards</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <style>
+    body { font-family: "Manrope", system-ui, sans-serif; }
+    .hero-title { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.2rem); }
+    .hero-sub { margin-top: 6px; }
+    .stats { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+    .stat { text-align: left; }
+    .stat-value { font-size: 1.8rem; }
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: var(--surface-2); }
+    .state { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="fs-page">
+    <section class="hero">
+      <h1 class="hero-title">Operational Dashboards</h1>
+      <p class="hero-sub">Live registration and delivery summary powered by Supabase.</p>
+    </section>
 
+    <section class="card">
+      <div class="fs-row" style="margin-bottom:10px;">
+        <strong>Platform Snapshot</strong>
+        <span class="spacer"></span>
+        <button id="refreshBtn" class="btn primary">Refresh</button>
+      </div>
+      <div id="stats" class="stats"></div>
+      <div id="statsState" class="state">Loading summary metrics...</div>
+    </section>
 
-async function initBatches(){const {data,error}=await db.from('batches').select('batch_id,batch_name,status,active').order('created_at',{ascending:false}); if(error){showErr('overview',error);return} $('batch').innerHTML=(data||[]).map(b=>`<option value="${esc(b.batch_id)}">${esc(b.batch_id)} â€” ${esc(b.batch_name||b.status||'')}</option>`).join(''); loadDash()}
-async function loadDash(){const bid=$('batch').value; if(!bid)return; try{const [apps,students,classes,emails,moodle]=await Promise.all([db.from('applicants').select('group_id,subgroup_id,status,batch_id').eq('batch_id',bid),db.from('students').select('group_id,subgroup_id,status,batch_id').eq('batch_id',bid),db.from('class_options').select('group_id,subgroup_id,active,enrollment_open'),db.from('email_queue').select('status,created_at'),db.from('moodle_sync').select('subgroup_id,moodle_progress,exam_passed,batch_id').eq('batch_id',bid)]); for(const r of [apps,students,classes,emails,moodle]) if(r.error)throw r.error; const app=apps.data||[], stu=students.data||[], cls=classes.data||[], em=emails.data||[], mo=moodle.data||[]; $('overview').innerHTML=[['Applicants',app.length],['Students',stu.length],['Active Classes',cls.filter(x=>x.active).length],['Open Class Options',cls.filter(x=>x.enrollment_open).length],['Pending Emails',em.filter(x=>x.status==='Pending').length],['Failed Emails',em.filter(x=>x.status==='Failed').length]].map(([l,v])=>`<div class="metric"><strong>${v}</strong><span>${l}</span></div>`).join(''); const by={}; [...app,...stu].forEach(r=>{const g=r.group_id||'Unknown'; by[g]=by[g]||{app:0,stu:0}; if(app.includes(r))by[g].app++; else by[g].stu++}); $('groups').innerHTML=rowsToTable(['Group','Applicants','Students','Total'],Object.entries(by).map(([g,v])=>`<tr><td>${esc(g)}</td><td>${v.app}</td><td>${v.stu}</td><td>${v.app+v.stu}</td></tr>`)); $('attendance').innerHTML='<p class="small">For deeper attendance analytics, add the SQL views in <code>dashboard_views.sql</code>. This page currently shows enrollment-facing metrics only.</p>'; const avg=mo.length?Math.round(mo.reduce((s,r)=>s+Number(r.moodle_progress||0),0)/mo.length):0; $('moodle').innerHTML=rowsToTable(['Metric','Value'],[`<tr><td>Tracked Moodle Rows</td><td>${mo.length}</td></tr>`,`<tr><td>Average Progress</td><td>${avg}%</td></tr>`,`<tr><td>Exam Passed</td><td>${mo.filter(r=>r.exam_passed).length}</td></tr>`])}catch(e){showErr('overview',e)}}
-initBatches();
-</script>  <script src="../ui/premium-shell.js"></script>
-</body></html>
+    <section class="card">
+      <h3 style="margin-top:0;">Recent Registrations</h3>
+      <div id="recentState" class="state">Loading recent registrations...</div>
+      <div id="recentWrap" class="table-wrap hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Fellowship</th>
+              <th>Batch</th>
+              <th>Status</th>
+              <th>Availability</th>
+            </tr>
+          </thead>
+          <tbody id="recentRows"></tbody>
+        </table>
+      </div>
+    </section>
 
+    <section class="card">
+      <h3 style="margin-top:0;">Migration Notes</h3>
+      <ul id="migrationNotes" class="muted" style="margin:0 0 0 18px;"></ul>
+    </section>
+  </main>
 
+  <script src="../js/config.js"></script>
+  <script src="../js/admin-shell.js"></script>
+  <script type="module">
+    import { supabase, getCurrentProfile } from "../auth/auth-client.js";
 
+    const $ = (id) => document.getElementById(id);
+    const roleAllow = new Set(["admin", "superadmin", "subgroup_admin", "pastor"]);
+    const missingTables = new Set();
 
+    function stateMessage(targetId, msg) {
+      $(targetId).textContent = msg;
+      $(targetId).classList.remove("hidden");
+    }
 
+    function hideState(targetId) {
+      $(targetId).classList.add("hidden");
+    }
+
+    const isMissingTable = (error) => {
+      const msg = String(error?.message || "").toLowerCase();
+      return error?.code === "42P01" || msg.includes("does not exist") || msg.includes("relation");
+    };
+
+    async function safeCount(table, apply) {
+      let query = supabase.from(table).select("*", { count: "exact", head: true });
+      if (typeof apply === "function") query = apply(query);
+      const { count, error } = await query;
+      if (error) {
+        if (isMissingTable(error)) {
+          missingTables.add(table);
+          return 0;
+        }
+        throw error;
+      }
+      return count || 0;
+    }
+
+    async function ensureAccess() {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        window.location.href = "login.html";
+        return null;
+      }
+      const profile = await getCurrentProfile();
+      if (!profile || !roleAllow.has(profile.role)) {
+        stateMessage("statsState", "Access denied for this account.");
+        return null;
+      }
+      return profile;
+    }
+
+    function renderStats(items) {
+      $("stats").innerHTML = items.map((item) => `
+        <article class="stat">
+          <div class="stat-value">${item.value}</div>
+          <div class="stat-label">${item.label}</div>
+        </article>
+      `).join("");
+    }
+
+    async function loadStats() {
+      stateMessage("statsState", "Loading summary metrics...");
+      missingTables.clear();
+
+      const totalApplicants = await safeCount("applicants");
+      const assigned = await safeCount("applicants", (q) => q.eq("registration_status", "ASSIGNED"));
+      const waitlisted = await safeCount("applicants", (q) => q.eq("registration_status", "WAITLISTED"));
+      const duplicates = await safeCount("applicants", (q) => q.eq("registration_status", "DUPLICATE"));
+      const activeBatches = await safeCount("batches", (q) => q.eq("active", true));
+      const queuedEmails = await safeCount("email_queue", (q) => q.in("status", ["Pending", "pending", "queued", "QUEUED"]));
+      const failedSyncs = await safeCount("failed_syncs", (q) => q.in("status", ["failed", "error", "FAILED", "ERROR"]));
+
+      renderStats([
+        { label: "Total Applicants", value: totalApplicants },
+        { label: "Assigned", value: assigned },
+        { label: "Waitlisted", value: waitlisted },
+        { label: "Duplicates", value: duplicates },
+        { label: "Active Batches", value: activeBatches },
+        { label: "Queued Emails", value: queuedEmails },
+        { label: "Failed Syncs", value: failedSyncs },
+      ]);
+
+      hideState("statsState");
+    }
+
+    function findAny(obj, keys) {
+      return keys.map((k) => obj?.[k]).find((v) => v !== undefined && v !== null && v !== "") || "-";
+    }
+
+    function fmtTime(value) {
+      if (!value) return "-";
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+    }
+
+    async function loadRecent() {
+      stateMessage("recentState", "Loading recent registrations...");
+      $("recentWrap").classList.add("hidden");
+
+      const { data, error } = await supabase
+        .from("applicants")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) {
+        if (isMissingTable(error)) {
+          missingTables.add("applicants");
+          stateMessage("recentState", "Missing table: applicants.");
+          return;
+        }
+        stateMessage("recentState", `Could not load recent registrations: ${error.message}`);
+        return;
+      }
+
+      const rows = (data || []).map((row) => `
+        <tr>
+          <td>${fmtTime(findAny(row, ["created_at", "submitted_at"]))}</td>
+          <td>${findAny(row, ["full_name", "name", "applicant_name"])}</td>
+          <td>${findAny(row, ["email", "email_address"])}</td>
+          <td>${findAny(row, ["fellowship", "fellowship_name", "group_id"])}</td>
+          <td>${findAny(row, ["batch_id", "batch_name"])}</td>
+          <td>${findAny(row, ["registration_status", "status"])}</td>
+          <td>${findAny(row, ["availability_status", "availability_outcome"])}</td>
+        </tr>
+      `).join("");
+
+      $("recentRows").innerHTML = rows || `<tr><td colspan="7">No recent registrations found.</td></tr>`;
+      hideState("recentState");
+      $("recentWrap").classList.remove("hidden");
+    }
+
+    function renderMigrationNotes() {
+      const notes = $("migrationNotes");
+      const items = [...missingTables].map((t) => `Missing required table: ${t}`);
+      if (!items.length) {
+        notes.innerHTML = "<li>No missing-table migrations detected for this view.</li>";
+        return;
+      }
+      notes.innerHTML = items.map((i) => `<li>${i}</li>`).join("");
+    }
+
+    async function refresh() {
+      try {
+        await loadStats();
+        await loadRecent();
+      } finally {
+        renderMigrationNotes();
+      }
+    }
+
+    async function init() {
+      const profile = await ensureAccess();
+      if (!profile) return;
+
+      window.FSAdminShell?.mount({
+        active: "dashboard",
+        title: "Foundation School Admin",
+        profileName: profile.full_name || profile.email || "Admin",
+        role: profile.role,
+        breadcrumbs: [{ label: "Admin", href: "admin-dashboard.html" }, "Dashboards"],
+      });
+
+      $("refreshBtn").addEventListener("click", refresh);
+      await refresh();
+    }
+
+    init();
+  </script>
+</body>
+</html>
