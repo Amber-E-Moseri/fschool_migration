@@ -56,6 +56,6 @@ EOF
 
 ## Forbidden patterns
 - `const SUPABASE_URL = 'https://...supabase.co'` in committed source.
-- `const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlbHBzdHRxaHJjcW10dG1qb3J5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4ODcxMTMsImV4cCI6MjA5MzQ2MzExM30.7a5yGvkaxxUBMOZl-_nZjjDCVYYvf4FrmwwhrzYd9zQ'` in committed source.
+- `const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY` in committed source.
 - `meta name="supabase-url"` / `meta name="supabase-anon-key"` credential injection.
 
