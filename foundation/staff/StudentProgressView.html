@@ -1,0 +1,724 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="api-url" content="https://script.google.com/macros/s/AKfycbwQQhGZvLcX689zhC6kL9RgbubHGbh8FFMCoO2zSXBrNn21WIUGmPP_xPXa06QOHb00nA/exec" />
+  <title>Student Progress</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+  :root {
+    --navy:         #3D2A8A;
+    --lilacSoft:    #EDE9FA;
+    --gold:         #F5A623;
+    --ink:          #1E1535;
+    --muted:        #7C6FA0;
+    --border:       #E8E6F0;
+    --bg:           #F7F6FB;
+    --primary:      #3D2A8A;
+    --success:      #276749;
+    --success-soft: #ECFDF3;
+    --danger:       #8C1F1F;
+    --danger-soft:  #FFF0F0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: .92rem;
+  }
+  .nav-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 800;
+    box-shadow: none;
+  }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: .82rem;
+    color: var(--muted);
+    transition: all .15s;
+  }
+  .nav-link:hover,
+  .nav-link.active {
+    background: var(--lilacSoft);
+    color: var(--navy);
+    border-color: transparent;
+  }
+  @media (max-width: 600px) {
+    .nav-link span { display: none; }
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 22px;
+    margin-bottom: 16px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .card-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background: var(--lilacSoft);
+    color: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .card-title { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .card-sub { font-size: .84rem; color: var(--muted); margin-top: 3px; }
+  .setup-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .setup-field { flex: 1; min-width: 180px; }
+  label {
+    display: block;
+    font-size: .7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  input, select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: .9rem;
+    color: var(--ink);
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .15s;
+  }
+  input:focus, select:focus {
+    border-color: var(--navy);
+    box-shadow: none;
+  }
+  input::placeholder { color: var(--muted); }
+  .dropdown { position: relative; }
+  .drop-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: none;
+    z-index: 50;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 6px;`n    box-shadow: 0 4px 12px rgba(30,21,53,.08);`n  }
+  .drop-item {
+    padding: 9px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .88rem;
+    font-weight: 600;
+    transition: background .12s;
+  }
+  .drop-item:hover, .drop-item.sel {
+    background: var(--lilacSoft);
+    color: var(--navy);
+  }
+  .drop-item-sub {
+    font-size: .76rem;
+    color: var(--muted);
+    font-weight: 400;
+    margin-top: 1px;
+  }
+  .btn {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--ink);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: .84rem;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    box-shadow: none;
+  }
+  .btn:hover { opacity: .92; border-color: #D8D4E8; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.primary {
+    background: var(--navy);
+    color: #fff;
+    border: 1px solid var(--navy);
+    box-shadow: none;
+  }
+  .btn.primary:hover { opacity: .92; }
+  .search-wrap { position: relative; flex: 1; min-width: 180px; }
+  .search-wrap input { padding-left: 34px; }
+  .search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: .9rem;
+    pointer-events: none;
+  }
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .stats-strip {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .stat-chip {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+  .stat-chip .val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .stat-chip .lbl {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+  }
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .leg {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: .76rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .leg-dot { width: 14px; height: 14px; border-radius: 4px; }
+  .tbl-outer {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    box-shadow: none;
+  }
+  table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; }
+  thead th {
+    background: #fff;
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 800;
+    color: var(--muted);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 4;
+  }
+  thead th.name-col {
+    text-align: left;
+    padding-left: 16px;
+    padding-right: 12px;
+    position: sticky;
+    left: 0;
+    z-index: 6;
+    background: #fff;
+    border-right: 1px solid var(--border);
+    min-width: 180px;
+  }
+  thead th.session-hdr { padding: 10px 8px; min-width: 52px; }
+  thead tr.group-row th {
+    padding: 6px 0;
+    border-bottom: none;
+    font-size: .65rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    background: var(--lilacSoft);
+    color: var(--navy);
+    font-weight: 800;
+  }
+  thead tr.group-row th.name-col {
+    background: var(--lilacSoft);
+    color: transparent;
+  }
+  tbody tr { transition: background .12s; }
+  tbody tr:hover td { background: #FAF9FE; }
+  tbody tr:hover td.name-col { background: #F6F3FD; }
+  td {
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    vertical-align: middle;
+  }
+  td.name-col {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    border-right: 1px solid var(--border);
+    padding: 8px 12px 8px 16px;
+    text-align: left;
+    z-index: 2;
+  }
+  td.name-col:hover { background: #F6F3FD; }
+  .student-name {
+    font-weight: 700;
+    font-size: .88rem;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .student-id {
+    font-size: .72rem;
+    color: var(--muted);
+    margin-top: 1px;
+    font-weight: 500;
+  }
+  .cb-cell { width: 52px; }
+  .cb {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 2px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    cursor: default;
+    flex-shrink: 0;
+    box-shadow: none;
+  }
+  .cb.checked {
+    background: var(--navy);
+    border-color: var(--navy);
+    box-shadow: none;
+  }
+  .cb.unchecked {
+    background: #fff;
+    border-color: var(--border);
+  }
+  .cb svg { display: none; }
+  .cb.checked svg { display: block; }
+  .prog-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .prog-bar {
+    width: 56px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .prog-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--navy);
+    transition: width .4s ease;
+  }
+  .prog-pct {
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 28px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 700;
+  }
+  .badge.active { background: var(--success-soft); color: var(--success); }
+  .badge.inactive { background: var(--danger-soft); color: var(--danger); }
+  .state-msg {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg {
+    background: var(--danger-soft);
+    border: 1px solid var(--border);
+    color: var(--danger);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: .86rem;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .hidden { display: none !important; }
+  @media (max-width: 600px) {
+    .wrap { padding: 14px 10px 50px; }
+    .card { padding: 16px; border-radius: 10px; }
+    .stats-strip { gap: 7px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <div class="nav-mark">RS</div>
+    Rock Solid Foundation School
+  </div>
+  <div class="nav-links">
+    <a class="nav-link" href="TeacherAttendancePortal.html">✅ <span>Attendance</span></a>
+    <a class="nav-link active" href="#">📊 <span>Progress</span></a>
+    <a class="nav-link" href="teacher-schedule.html">📅 <span>Schedule</span></a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- SETUP -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-icon">📊</div>
+      <div>
+        <div class="card-title">Student Class Progress</div>
+        <div class="card-sub">Class attendance checkboxes — read-only view from student records</div>
+      </div>
+    </div>
+
+    <div class="setup-row">
+      <!-- Teacher search -->
+      <div class="setup-field dropdown" style="flex:2;min-width:200px">
+        <label>Teacher</label>
+        <input id="teacherQuery" placeholder="Search by name or ID…" oninput="onTeacherInput()" autocomplete="off" />
+        <div class="drop-list hidden" id="teacherDrop"></div>
+      </div>
+
+      <!-- Class select (populated after teacher picked) -->
+      <div class="setup-field" style="flex:2;min-width:200px">
+        <label>Class</label>
+        <select id="classSelect" disabled>
+          <option value="">— select teacher first —</option>
+        </select>
+      </div>
+
+      <div class="setup-field" style="flex:0">
+        <label>&nbsp;</label>
+        <button class="btn primary" id="loadBtn" onclick="loadGrid()" disabled>Load Students</button>
+      </div>
+    </div>
+    <div id="setup-error"></div>
+  </div>
+
+  <!-- GRID SECTION -->
+  <div class="card hidden" id="grid-card">
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="studentSearch" placeholder="Filter students…" oninput="filterTable()" autocomplete="off" />
+      </div>
+      <div style="display:flex;gap:6px;margin-left:auto">
+        <button class="btn" onclick="exportCSV()">↓ Export</button>
+      </div>
+    </div>
+
+    <div class="stats-strip" id="stats-strip"></div>
+
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--success);border-radius:4px"></div> Attended</div>
+      <div class="leg"><div class="leg-dot" style="background:rgba(239,68,68,.18);border:2px solid rgba(239,68,68,.3);border-radius:4px"></div> Not attended</div>
+    </div>
+
+    <div class="tbl-outer">
+      <table id="progress-table">
+        <thead id="tbl-head"></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+
+    <div id="grid-msg"></div>
+  </div>
+
+</main>
+
+<script>
+  const API_URL = (document.querySelector('meta[name="api-url"]')?.content || '').trim();
+  // Only Class columns (not Work columns, not EXAM)
+  const CLASS_COLS = ['1_Class','2_Class','3_Class','4A_Class','4B_Class','5_Class','6_Class','7_Class'];
+  const COL_LABELS = {'1_Class':'1','2_Class':'2','3_Class':'3','4A_Class':'4A','4B_Class':'4B','5_Class':'5','6_Class':'6','7_Class':'7'};
+
+  const state = { teacher:null, teachers:[], classes:[], classOptionId:'', students:[], filtered:[] };
+
+  function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  async function apiGet(action, params={}) {
+    const u = new URL(API_URL);
+    u.searchParams.set('action', action);
+    Object.entries(params).forEach(([k,v]) => u.searchParams.set(k,v));
+    const r = await fetch(u);
+    const j = await r.json();
+    if (!r.ok || j.ok===false) throw new Error(j.error||'Request failed');
+    return j;
+  }
+
+  // ── TEACHER SEARCH ──
+  let tmr = null;
+  function onTeacherInput() {
+    clearTimeout(tmr);
+    const q = document.getElementById('teacherQuery').value.trim();
+    hideDrop();
+    if (q.length < 2) return;
+    tmr = setTimeout(() => searchTeacher(q), 220);
+  }
+
+  async function searchTeacher(q) {
+    try {
+      const r = await apiGet('lookupTeacherForAttendance', { query:q });
+      state.teachers = r.data || [];
+      const drop = document.getElementById('teacherDrop');
+      if (!state.teachers.length) { drop.innerHTML = '<div class="drop-item" style="color:var(--text-muted)">No matches</div>'; drop.classList.remove('hidden'); return; }
+      drop.innerHTML = state.teachers.map(t =>
+        `<div class="drop-item" onclick="pickTeacher('${esc(t.teacherId)}')">
+          ${esc(t.fullName)}
+          <div class="drop-item-sub">${esc(t.email||'')} ${esc(t.subGroupLabel||'')}</div>
+        </div>`).join('');
+      drop.classList.remove('hidden');
+    } catch(e) { console.error(e); }
+  }
+
+  function hideDrop() { document.getElementById('teacherDrop').classList.add('hidden'); }
+  document.addEventListener('click', e => { if (!e.target.closest('.dropdown')) hideDrop(); });
+
+  async function pickTeacher(id) {
+    state.teacher = state.teachers.find(t => t.teacherId===id);
+    document.getElementById('teacherQuery').value = state.teacher?.fullName || '';
+    hideDrop();
+    // Load classes
+    const sel = document.getElementById('classSelect');
+    sel.innerHTML = '<option value="">Loading…</option>';
+    sel.disabled = true;
+    document.getElementById('loadBtn').disabled = true;
+    try {
+      const r = await apiGet('getTeacherActiveClassOptions', { teacherId: state.teacher.teacherId });
+      state.classes = r.data || [];
+      sel.innerHTML = state.classes.map(c =>
+        `<option value="${esc(c.classOptionId)}">${esc(c.campus||c.fellowship||c.classOptionId)} — ${esc(c.day)} ${esc(c.time)}</option>`
+      ).join('') || '<option value="">No active classes</option>';
+      sel.disabled = false;
+      document.getElementById('loadBtn').disabled = false;
+      state.classOptionId = state.classes[0]?.classOptionId || '';
+      sel.value = state.classOptionId;
+    } catch(e) {
+      sel.innerHTML = '<option value="">Error loading classes</option>';
+    }
+  }
+
+  // ── LOAD GRID ──
+  async function loadGrid() {
+    state.classOptionId = document.getElementById('classSelect').value;
+    if (!state.teacher || !state.classOptionId) {
+      document.getElementById('setup-error').innerHTML = '<div class="error-msg">Please select a teacher and class.</div>';
+      return;
+    }
+    document.getElementById('setup-error').innerHTML = '';
+
+    const card = document.getElementById('grid-card');
+    card.classList.remove('hidden');
+    document.getElementById('tbl-head').innerHTML = '';
+    document.getElementById('tbl-body').innerHTML = `<tr><td colspan="${CLASS_COLS.length+2}" class="state-msg"><div class="spinner"></div>Loading students…</td></tr>`;
+    document.getElementById('stats-strip').innerHTML = '';
+    document.getElementById('grid-msg').innerHTML = '';
+
+    try {
+      const r = await apiGet('getTeacherClassProgressGrid', {
+        teacherId: state.teacher.teacherId,
+        classOptionId: state.classOptionId
+      });
+      state.students = (r.data?.students || []);
+      state.filtered = [...state.students];
+      renderTable();
+      card.scrollIntoView({behavior:'smooth', block:'start'});
+    } catch(e) {
+      document.getElementById('tbl-body').innerHTML = '';
+      document.getElementById('grid-msg').innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+    }
+  }
+
+  // ── RENDER ──
+  function renderTable() {
+    const rows = state.filtered;
+
+    // Build header — group row + column labels
+    document.getElementById('tbl-head').innerHTML = `
+      <tr class="group-row">
+        <th class="name-col"></th>
+        <th colspan="${CLASS_COLS.length}" style="text-align:center;letter-spacing:.1em">Class Sessions</th>
+        <th></th>
+      </tr>
+      <tr>
+        <th class="name-col">Student</th>
+        ${CLASS_COLS.map(c => `<th class="session-hdr">${COL_LABELS[c]}</th>`).join('')}
+        <th style="padding:10px 14px 10px 8px;min-width:100px;text-align:left">Progress</th>
+      </tr>`;
+
+    if (!rows.length) {
+      document.getElementById('tbl-body').innerHTML = `<tr><td colspan="${CLASS_COLS.length+2}" class="state-msg">No students found.</td></tr>`;
+      renderStats([]);
+      return;
+    }
+
+    document.getElementById('tbl-body').innerHTML = rows.map(s => {
+      const checks = CLASS_COLS.map(c => !!s[c]);
+      const attended = checks.filter(Boolean).length;
+      const pct = CLASS_COLS.length ? Math.round(attended / CLASS_COLS.length * 100) : 0;
+      return `<tr>
+        <td class="name-col">
+          <div class="student-name">${esc(s.fullName||'—')}</div>
+          <div class="student-id">${esc(s.studentId||s.personType||'')}</div>
+        </td>
+        ${checks.map(on => `
+          <td class="cb-cell">
+            <div class="cb ${on?'checked':'unchecked'}">
+              <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                <path d="M1 4L4 7.5L10 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </td>`).join('')}
+        <td style="padding:8px 14px 8px 8px">
+          <div class="prog-wrap">
+            <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+            <div class="prog-pct">${pct}%</div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    renderStats(rows);
+  }
+
+  function renderStats(rows) {
+    const total = rows.length;
+    let totalChecks = 0, possibleChecks = total * CLASS_COLS.length;
+    rows.forEach(s => { CLASS_COLS.forEach(c => { if (s[c]) totalChecks++; }); });
+    const overallPct = possibleChecks ? Math.round(totalChecks / possibleChecks * 100) : 0;
+
+    // Per-session attended count
+    const perSession = CLASS_COLS.map(c => rows.filter(s => !!s[c]).length);
+
+    document.getElementById('stats-strip').innerHTML = `
+      <div class="stat-chip"><span class="val" style="color:var(--primary)">${total}</span><span class="lbl">Students</span></div>
+      <div class="stat-chip"><span class="val" style="color:var(--success)">${overallPct}%</span><span class="lbl">Overall Attendance</span></div>
+      ${CLASS_COLS.map((c,i) => `<div class="stat-chip"><span class="val" style="color:var(--text);font-size:1rem">${perSession[i]}</span><span class="lbl">Class ${COL_LABELS[c]}</span></div>`).join('')}
+    `;
+  }
+
+  // ── FILTER ──
+  function filterTable() {
+    const q = document.getElementById('studentSearch').value.toLowerCase();
+    state.filtered = q
+      ? state.students.filter(s => (s.fullName||'').toLowerCase().includes(q) || (s.studentId||'').toLowerCase().includes(q))
+      : [...state.students];
+    renderTable();
+  }
+
+  // ── EXPORT CSV ──
+  function exportCSV() {
+    const headers = ['StudentID','Name', ...CLASS_COLS.map(c => 'Class '+COL_LABELS[c]), 'Attended','Total','Pct'];
+    const rows = state.filtered.map(s => {
+      const checks = CLASS_COLS.map(c => s[c] ? '1' : '0');
+      const attended = checks.filter(v=>v==='1').length;
+      return [s.studentId||'', s.fullName||'', ...checks, attended, CLASS_COLS.length, Math.round(attended/CLASS_COLS.length*100)+'%'].join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+    a.download = `student-progress-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foundation School — Email Campaigns</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root{--navy:#4C2A92;--gold:#F4BE41;--bg:#f5f3fb;--border:#e2ddf0;--text:#1a1230;--muted:#6b7280;--success:#166534;--success-bg:#dcfce7;--danger:#991b1b;--danger-bg:#fee2e2;--warn:#92400e;--warn-bg:#fef3c7;--info:#1e40af;--info-bg:#dbeafe}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px}
+header{background:var(--navy);color:white;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.header-inner{max-width:1180px;margin:0 auto;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:10px;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:900}
+.brand h1{font-size:17px;margin:0}
+.brand p{margin:2px 0 0;opacity:.75;font-size:12px}
+main{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
+.card{background:white;border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:0 8px 28px rgba(76,42,146,.06)}
+.card h2{font-size:16px;color:var(--navy);margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+button,.btn{border:0;border-radius:9px;padding:10px 15px;font-weight:700;cursor:pointer;background:var(--navy);color:white;text-decoration:none;display:inline-block}
+button.secondary{background:white;color:var(--text);border:1px solid var(--border)}
+input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;background:white}
+label{font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:6px}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;background:#f8f6ff;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}
+td{border-top:1px solid var(--border);padding:10px 12px;vertical-align:top}
+tr:hover td{background:#faf9ff}
+.badge{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}
+.ok{background:var(--success-bg);color:var(--success)}
+.bad{background:var(--danger-bg);color:var(--danger)}
+.wait{background:var(--warn-bg);color:var(--warn)}
+.info{background:var(--info-bg);color:var(--info)}
+.muted{color:var(--muted)}
+.error{background:var(--danger-bg);border:1px solid #fca5a5;color:var(--danger);padding:12px;border-radius:10px;margin:10px 0}
+.actions{display:flex;gap:7px;flex-wrap:wrap}
+.small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="logo">FS</div>
+      <div>
+        <h1>Foundation School — Email Campaigns</h1>
+        <p>Queue onboarding, reminder, and follow-up emails</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a class="btn" href="admin-portal.html">Admin Portal</a>
+      <button class="secondary" onclick="signOut()">Sign Out</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="card">
+  <h2>Queue Email</h2>
+
+  <div class="grid">
+    <div>
+      <label>Recipient Email</label>
+      <input id="recipientEmail" placeholder="student@email.com">
+    </div>
+
+    <div>
+      <label>Recipient Name</label>
+      <input id="recipientName" placeholder="First Last">
+    </div>
+
+    <div>
+      <label>Template</label>
+      <select id="templateKey">
+        <option value="foundation_welcome">Foundation Welcome</option>
+        <option value="class_reminder">Class Reminder</option>
+        <option value="no_suitable_times">No Suitable Times</option>
+        <option value="tmc26_reminder">TMC26 Reminder</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Subject</label>
+      <input id="subject" placeholder="Welcome to Foundation School">
+    </div>
+  </div>
+
+  <p class="small" style="margin-top:12px;">
+    This queues the email only. Mailchimp sending will later be handled by the Edge Function.
+  </p>
+
+  <button onclick="queueEmail()">Queue Email</button>
+</section>
+
+<section class="card">
+  <div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2 style="margin:0;">Email Queue</h2>
+    <button class="secondary" onclick="loadEmails()">Refresh</button>
+  </div>
+
+  <div id="emails"></div>
+</section>
+
+</main>
+
+<script>
+const SUPABASE_URL =
+  window.FS_SUPABASE_URL || "https://xelpsttqhrcqmttmjory.supabase.co";
+
+const SUPABASE_ANON_KEY =
+  window.FS_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlbHBzdHRxaHJjcW10dG1qb3J5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4ODcxMTMsImV4cCI6MjA5MzQ2MzExM30.7a5yGvkaxxUBMOZl-_nZjjDCVYYvf4FrmwwhrzYd9zQ";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const $ = id => document.getElementById(id);
+
+function esc(v){
+  return String(v ?? "").replace(/[&<>'"]/g, c => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    "'":"&#39;",
+    '"':"&quot;"
+  }[c]));
+}
+
+function fmt(v){
+  if(!v) return "—";
+  try { return new Date(v).toLocaleString(); }
+  catch { return v; }
+}
+
+function badge(s){
+  const x = String(s || "").toLowerCase();
+
+  const cls =
+    x.includes("fail") || x.includes("error")
+      ? "bad"
+      : x.includes("pending") || x.includes("queue")
+        ? "wait"
+        : x.includes("sent") || x.includes("complete")
+          ? "ok"
+          : "info";
+
+  return `<span class="badge ${cls}">${esc(s || "—")}</span>`;
+}
+
+async function signOut(){
+  await db.auth.signOut();
+  location.href = "login.html";
+}
+
+function rowsToTable(headers, rows){
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${
+            rows.length
+              ? rows.join("")
+              : `<tr><td colspan="${headers.length}" class="muted">No records found.</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function showErr(id, e){
+  $(id).innerHTML =
+    `<div class="error">${esc(e.message || e)}</div>`;
+}
+
+async function queueEmail(){
+  const recipient_email = $("recipientEmail").value.trim();
+  const recipient_name = $("recipientName").value.trim();
+  const template_key = $("templateKey").value;
+  const subject = $("subject").value.trim();
+
+  if(!recipient_email || !template_key){
+    alert("Recipient email and template are required.");
+    return;
+  }
+
+  const { error } = await db
+    .from("email_queue")
+    .insert({
+      recipient_email,
+      recipient_name,
+      template_key,
+      subject,
+      status: "Pending",
+      payload: {
+        recipient_email,
+        recipient_name,
+        template_key,
+        subject
+      }
+    });
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  alert("Email queued.");
+
+  $("recipientEmail").value = "";
+  $("recipientName").value = "";
+  $("subject").value = "";
+
+  loadEmails();
+}
+
+async function loadEmails(){
+  const el = $("emails");
+  el.innerHTML = "Loading…";
+
+  try{
+    const { data, error } = await db
+      .from("email_queue")
+      .select("*")
+      .order("created_at", { ascending:false })
+      .limit(100);
+
+    if(error) throw error;
+
+    el.innerHTML = rowsToTable(
+      ["Created", "Recipient", "Name", "Template", "Subject", "Status", "Error"],
+      (data || []).map(row => `
+        <tr>
+          <td>${fmt(row.created_at)}</td>
+          <td>${esc(row.recipient_email)}</td>
+          <td>${esc(row.recipient_name || "—")}</td>
+          <td>${esc(row.template_key)}</td>
+          <td>${esc(row.subject || "—")}</td>
+          <td>${badge(row.status)}</td>
+          <td>${esc(row.error_message || "—")}</td>
+        </tr>
+      `)
+    );
+
+  } catch(e){
+    showErr("emails", e);
+  }
+}
+
+loadEmails();
+</script>
+
+</body>
+</html>

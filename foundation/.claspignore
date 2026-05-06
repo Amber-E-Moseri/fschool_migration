@@ -1,0 +1,26 @@
+# Frontend app (Vite/React) should not be pushed to Apps Script.
+ui/**
+
+# Local/static prototype files not meant for GAS runtime.
+teacher-availability-calendly-prototype.html
+teacher-availability-prototype.html
+foundation_school.html
+fsch.html
+
+# Node / build artifacts
+node_modules/**
+dist/**
+
+# Frontend toolchain files
+**/package.json
+**/package-lock.json
+**/vite.config.js
+**/postcss.config.js
+**/tailwind.config.js
+**/.env
+**/.env.*
+
+# Misc
+.git/**
+.gitignore
+README.md

@@ -1,0 +1,840 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="api-url" content="https://script.google.com/macros/s/AKfycbwQQhGZvLcX689zhC6kL9RgbubHGbh8FFMCoO2zSXBrNn21WIUGmPP_xPXa06QOHb00nA/exec" />
+  <title>Teacher Attendance Portal</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+  <style>
+  :root {
+    --navy:         #3D2A8A;
+    --lilacSoft:    #EDE9FA;
+    --gold:         #F5A623;
+    --ink:          #1E1535;
+    --muted:        #7C6FA0;
+    --border:       #E8E6F0;
+    --bg:           #F7F6FB;
+    --primary:      #3D2A8A;
+    --success:      #276749;
+    --success-soft: #ECFDF3;
+    --danger:       #8C1F1F;
+    --danger-soft:  #FFF0F0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  .rs-nav {
+    position: sticky;
+    top: 0;
+    z-index: 70;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+  }
+  .rs-nav__inner {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .rs-nav__brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: var(--navy);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    box-shadow: none;
+  }
+  .rs-nav__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: .86rem;
+    color: var(--muted);
+  }
+  .rs-nav__link:hover {
+    background: var(--lilacSoft);
+    color: var(--navy);
+    opacity: 1;
+  }
+  .rs-nav__link.is-active {
+    background: var(--lilacSoft);
+    color: var(--navy);
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .rs-nav__icon { font-size: 1rem; line-height: 1; }
+  .rs-nav__label { line-height: 1; }
+  @media (max-width: 600px) {
+    .rs-nav__label { display: none; }
+    .rs-nav__inner { padding: 10px 12px; }
+    .rs-nav__link { padding: 8px 10px; }
+  }
+  .topbar {
+    position: sticky;
+    top: 52px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 24px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 800;
+    font-size: .96rem;
+    color: var(--ink);
+    min-width: 0;
+  }
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: none;
+    flex-shrink: 0;
+  }
+  .topbar-badge {
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 22px 16px calc(120px + env(safe-area-inset-bottom));
+  }
+  .hero { margin-bottom: 22px; padding: 8px 4px; }
+  .hero-title {
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    line-height: 1.02;
+  }
+  .hero-sub {
+    margin-top: 10px;
+    max-width: 720px;
+    color: var(--muted);
+    font-size: 1rem;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 28px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: .84rem;
+    font-weight: 700;
+  }
+  .step-dot {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: .82rem;
+    color: var(--muted);
+    transition: all .2s ease;
+  }
+  .step.active .step-dot {
+    background: var(--navy);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: none;
+  }
+  .step.done .step-dot {
+    background: var(--success-soft);
+    color: var(--success);
+    border-color: var(--border);
+  }
+  .step-line { width: 42px; height: 1px; background: var(--border); flex-shrink: 0; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 24px;
+    margin-bottom: 18px;
+    animation: fadeUp .28s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+  .card-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    background: var(--lilacSoft);
+    color: var(--navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .card-title { font-size: 1.05rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
+  .card-sub { margin-top: 4px; font-size: .88rem; color: var(--muted); }
+  .field { margin-bottom: 16px; }
+  label, .field label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: .78rem;
+    font-weight: 800;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  input, select, textarea {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: .94rem;
+    color: var(--ink);
+    transition: all .18s ease;
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+  }
+  input::placeholder { color: var(--muted); }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--navy);
+    box-shadow: none;
+  }
+  .row, .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 18px;
+  }
+  .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--ink);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: .88rem;
+    cursor: pointer;
+    transition: all .18s ease;
+    box-shadow: none;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn:hover { opacity: .92; border-color: #D8D4E8; }
+  .btn:active { opacity: .92; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+  .btn.primary {
+    background: var(--navy);
+    color: #fff;
+    border: 1px solid var(--navy);
+    box-shadow: none;
+  }
+  .btn.primary:hover { opacity: .92; }
+  .btn.success {
+    color: var(--success);
+    background: var(--success-soft);
+    border-color: var(--border);
+  }
+  .btn.danger {
+    color: var(--danger);
+    background: var(--danger-soft);
+    border-color: var(--border);
+  }
+  .item {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: all .18s ease;
+    cursor: pointer;
+  }
+  .item:hover { opacity: .92; border-color: #D8D4E8; }
+  .item.sel {
+    background: var(--lilacSoft);
+    border-color: var(--navy);
+    box-shadow: none;
+  }
+  .item-name, .item strong { font-weight: 800; color: var(--ink); }
+  .item-meta, .muted { font-size: .84rem; color: var(--muted); line-height: 1.45; }
+  .alert, .error, .ok {
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-size: .88rem;
+    margin-top: 12px;
+    font-weight: 700;
+  }
+  
+  .warn {
+    background: #FEF6E4;
+    border: 1px solid #F5D78A;
+    color: #7A5A00;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .err {
+    background: var(--danger-soft);
+    border: 1px solid var(--border);
+    color: var(--danger);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .action-tile {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    padding: 22px;
+    cursor: pointer;
+    transition: all .18s ease;
+  }
+  .action-tile:hover { opacity: .92; border-color: #D8D4E8; }
+  .action-icon { font-size: 1.7rem; margin-bottom: 10px; }
+  .action-title { font-weight: 800; color: var(--ink); margin-bottom: 4px; }
+  .action-sub { color: var(--muted); font-size: .86rem; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .toolbar input { flex: 1; min-width: 220px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+  .stat {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; }
+  .stat-label { margin-top: 4px; font-size: .72rem; font-weight: 800; text-transform: uppercase; color: var(--muted); letter-spacing: .04em; }
+  .split { display: grid; grid-template-columns: 1fr 320px; gap: 14px; }
+  .panel {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: none;
+  }
+  .panel-title {
+    font-size: .78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+  .scroll, .table-wrap {
+    overflow: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+  }
+  table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; }
+  th, td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    color: var(--muted);
+    font-size: .86rem;
+    white-space: nowrap;
+    text-align: center;
+  }
+  th {
+    background: #fff;
+    color: var(--muted);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-weight: 800;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr:hover td { background: #FAF9FE; }
+  tbody tr:hover td.name-col { background: #F6F3FD; }
+  th.sticky, td.sticky {
+    position: sticky;
+    left: 0;
+    text-align: left;
+    z-index: 3;
+    box-shadow: none;
+  }
+  th.sticky { background: #fff; z-index: 4; }
+  td.sticky { background: #fff; color: var(--ink); font-weight: 800; }
+  .context-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+    color: var(--muted);
+    font-size: .84rem;
+  }
+  .ctx-val { color: var(--ink); font-weight: 800; }
+  .ctx-sep { color: var(--muted); }
+  .roster-item { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .roster-main { min-width: 0; }
+  .roster-status {
+    flex-shrink: 0;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--muted);
+    transition: all .18s ease;
+  }
+  .item.sel { background: var(--lilacSoft); border-color: var(--navy); box-shadow: none; }
+  .item.sel .roster-status {
+    background: var(--success-soft);
+    color: var(--success);
+    border-color: var(--success);
+  }
+  .item:active { opacity: .92; }
+  .fab-row {
+    position: sticky;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    z-index: 20;
+    padding: 10px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(30,21,53,.4);
+    opacity: 1;
+    transition: opacity .22s ease;
+  }
+  #addModal {
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    border-radius: 10px 10px 0 0;
+    padding-top: 14px;
+    max-height: min(82vh,720px);
+    overflow: auto;
+    animation: sheetUp .24s ease;
+    background: #fff;
+    box-shadow: none;
+  }
+  #addModal::before {
+    content: '';
+    display: block;
+    width: 46px;
+    height: 5px;
+    margin: 0 auto 10px;
+    border-radius: 999px;
+    background: var(--border);
+  }
+  @keyframes sheetUp {
+    from { transform: translateY(26px); opacity: .2; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .hidden { display: none !important; }
+  @media (max-width: 900px) {
+    .split { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .wrap { padding: 14px 12px calc(120px + env(safe-area-inset-bottom)); }
+    .topbar { padding: 14px 16px; }
+    .card { padding: 18px; border-radius: 10px; }
+    .stats, .action-grid { grid-template-columns: 1fr; }
+    .hero-title { font-size: 2rem; }
+    .topbar-badge { display: none; }
+    .btn { width: 100%; justify-content: center; }
+    .spacer { display: none; }
+    .toolbar .btn { width: auto; }
+    .fab-row .btn { width: auto; flex: 1; }
+    .fab-row .spacer { display: block; }
+  }
+</style>
+</head>
+<body>
+  <nav class="rs-nav" aria-label="Teacher Portal Navigation">
+    <div class="rs-nav__inner">
+      <div class="rs-nav__brand">RS</div>
+      <a class="rs-nav__link is-active" href="TeacherAttendancePortal.html"><span class="rs-nav__icon">✅</span><span class="rs-nav__label">Attendance</span></a>
+      <a class="rs-nav__link" href="StudentProgressView.html"><span class="rs-nav__icon">📊</span><span class="rs-nav__label">Student Progress</span></a>
+      <a class="rs-nav__link" href="teacher-schedule.html"><span class="rs-nav__icon">📅</span><span class="rs-nav__label">My Schedule</span></a>
+    </div>
+  </nav>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">RS</div>
+      <div>Rock Solid Foundation School</div>
+    </div>
+    <div class="topbar-badge" id="ctx-badge">Teacher Attendance Portal</div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1 class="hero-title">Teacher Attendance Portal</h1>
+    </section>
+
+    <div class="stepper" id="stepper">
+      <div class="step active" id="step-1"><div class="step-dot">1</div><span>Teacher</span></div>
+      <div class="step-line"></div>
+      <div class="step" id="step-2"><div class="step-dot">2</div><span>Class</span></div>
+      <div class="step-line"></div>
+      <div class="step" id="step-3"><div class="step-dot">3</div><span>Action</span></div>
+      <div class="step-line"></div>
+      <div class="step" id="step-4"><div class="step-dot">4</div><span>Session</span></div>
+      <div class="step-line"></div>
+      <div class="step" id="step-5"><div class="step-dot">5</div><span>Submit</span></div>
+    </div>
+
+    <section class="card" id="s1">
+      <div class="card-header"><div class="card-icon">👤</div><div><div class="card-title">Find Teacher</div><div class="card-sub">Search by teacher ID, name, or email.</div></div></div>
+      <div class="field"><label>Teacher Search</label><input id="teacherQuery" placeholder="Search by teacher ID, name, or email" oninput="onTeacherInput()" autocomplete="off" /></div>
+      <div id="teacherList"></div>
+      <div class="btn-row"><div class="spacer"></div><button class="btn primary" id="to2" onclick="toClass()" disabled>Continue</button></div>
+    </section>
+
+    <section class="card hidden" id="s2">
+      <div class="card-header"><div class="card-icon">📚</div><div><div class="card-title">Select Class</div><div class="card-sub">Choose your active class assignment.</div></div></div>
+      <div id="classList"></div>
+      <div class="btn-row"><button class="btn" onclick="show(1)">Back</button><div class="spacer"></div><button class="btn primary" id="to3" onclick="toAction()" disabled>Continue</button></div>
+    </section>
+
+    <section class="card hidden" id="s3">
+      <div class="card-header"><div class="card-icon">✨</div><div><div class="card-title">Choose Action</div><div class="card-sub">Mark attendance or review student progress.</div></div></div>
+      <div class="action-grid">
+        <div class="action-tile" onclick="chooseAction('attendance')"><div class="action-icon">✅</div><div class="action-title">Mark Attendance</div><div class="action-sub">Record today’s attendance and outcomes.</div></div>
+        <div class="action-tile" onclick="chooseAction('progress')"><div class="action-icon">📊</div><div class="action-title">View Student Progress</div><div class="action-sub">Open StudentProgressView.</div></div>
+      </div>
+      <div id="actionMsg" class="muted" style="margin-top:12px"></div>
+      <div class="btn-row"><button class="btn" onclick="show(2)">Back</button></div>
+    </section>
+
+    <section class="card hidden" id="s4">
+      <div class="card-header"><div class="card-icon">🗓️</div><div><div class="card-title">Attendance Session</div><div class="card-sub">Select the class session and date.</div></div></div>
+      <div class="row" style="margin-top:0"><div style="flex:2;min-width:280px"><label>Session(s)</label><div id="sessionSel"></div></div><div style="flex:1;min-width:220px"><label>Class Date</label><input type="date" id="classDate" /></div></div>
+      <div id="already"></div>
+      <div class="btn-row"><button class="btn" onclick="show(3)">Back</button><div class="spacer"></div><button class="btn primary" onclick="loadRoster()">Load Roster</button></div>
+    </section>
+
+    <section class="card hidden" id="s5">
+      <div class="card-header"><div class="card-icon">🙋</div><div><div class="card-title">Mark Attendance</div><div class="card-sub">Tap a person to toggle present or absent.</div></div></div>
+      <div id="attendance-context" class="context-bar hidden"></div>
+      <div class="toolbar"><input id="rosterSearch" placeholder="Search roster" oninput="renderRoster()" autocomplete="off" /><button class="btn success" onclick="markAll(true)">All Present</button><button class="btn danger" onclick="markAll(false)">Clear</button><button class="btn" onclick="openAdd()">Add Existing Person</button></div>
+      <div id="roster"></div>
+      <div class="stats" id="roster-counts"><div class="stat"><div class="stat-value" id="count-present" style="color:var(--success)">0</div><div class="stat-label">Present</div></div><div class="stat"><div class="stat-value" id="count-absent" style="color:var(--danger)">0</div><div class="stat-label">Absent</div></div><div class="stat"><div class="stat-value" id="count-total" style="color:var(--primary)">0</div><div class="stat-label">Total</div></div></div>
+      <div class="btn-row fab-row"><button class="btn" onclick="show(4)">Back</button><div class="spacer"></div><button class="btn primary" onclick="review()">Review -></button></div>
+    </section>
+
+    <section class="card hidden" id="s6">
+      <div class="card-header"><div class="card-icon">📝</div><div><div class="card-title">Review & Submit</div><div class="card-sub">Confirm the attendance summary before submitting.</div></div></div>
+      <div id="reviewBox"></div>
+      <div id="submitMsg"></div>
+      <div class="btn-row fab-row"><button class="btn" onclick="show(5)">Back</button><div class="spacer"></div><button class="btn primary" id="submitBtn" onclick="submitTeacherAttendance()">Submit</button></div>
+    </section>
+
+    <section class="card hidden" id="s8">
+      <div class="card-header"><div class="card-icon">🌱</div><div><div class="card-title">Session Outcomes</div><div class="card-sub">Record configured milestones for present participants.</div></div></div>
+      <div id="outcomesBox"></div>
+      <div id="outcomeMsg"></div>
+      <div class="btn-row"><button class="btn" onclick="show(6)">Back</button><div class="spacer"></div><button class="btn" onclick="submitSessionOutcomes(false)">Skip / Flag Follow-up</button><button class="btn primary" onclick="submitSessionOutcomes(true)">Submit Outcomes</button></div>
+    </section>
+
+    <div id="addBackdrop" class="modal-backdrop hidden" onclick="closeAdd()"></div>
+    <section class="card hidden" id="addModal">
+      <div class="card-header"><div class="card-icon">➕</div><div><div class="card-title">Add Existing Person</div><div class="card-sub" id="addSubtitle">Search by name or email.</div></div></div>
+      <div class="field"><label>Search</label><input id="addQ" placeholder="Search by name or email" oninput="searchAttendancePerson()" autocomplete="off" /></div>
+      <div id="addList"></div>
+      <div id="enrollBox" class="hidden">
+        <div class="field"><label>Full Name</label><input id="enrollName" placeholder="Full name" /></div>
+        <div class="field"><label>Email</label><input id="enrollEmail" placeholder="name@example.com" /></div>
+        <div class="field"><label>Phone (optional)</label><input id="enrollPhone" placeholder="Phone" /></div>
+        <div class="field"><label>Fellowship</label><select id="enrollFellowship"><option value="">Select fellowship</option></select></div>
+        <div class="btn-row"><button class="btn success" onclick="enrollAndAdd()">Enroll & Add Present</button></div>
+      </div>
+      <div class="btn-row"><div class="spacer"></div><button class="btn" onclick="closeAdd()">Close</button></div>
+    </section>
+  </main>
+
+  <script>
+    const API_URL = (document.querySelector('meta[name="api-url"]')?.content || '').trim();
+    const SESSIONS = ['Class1','Class2','Class3','Class4A','Class4B','Class5','Class6','Class7'];
+    const state = { teacher:null, teachers:[], classes:[], classOption:null, action:'', sessions:['Class1'], session:'Class1', classDate:'', roster:[], attendance:{}, addResults:[], fellowships:[], milestones:[], attendanceSubmitted:false, lastRecords:[], gridRows:[] };
+
+    if (!API_URL || API_URL === '__TEACHER_ATTENDANCE_API_URL__') alert('API URL placeholder is not configured.');
+
+    function esc(s){ return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    async function apiGet(action, params = {}) {
+      const u = new URL(API_URL);
+      u.searchParams.set('action', action);
+      Object.entries(params).forEach(([k,v]) => u.searchParams.set(k, v));
+      const r = await fetch(u);
+      const j = await r.json();
+      if (!r.ok || j.ok === false) throw new Error(j.error || 'Request failed');
+      return j;
+    }
+
+    async function apiPost(action, body) {
+      const u = new URL(API_URL);
+      u.searchParams.set('action', action);
+      const r = await fetch(u, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+      const text = await r.text();
+      let j;
+      try { j = JSON.parse(text); } catch(e) { throw new Error('Invalid JSON response from Apps Script.'); }
+      if (!r.ok || j.ok === false) throw new Error(j.error || 'Request failed');
+      return j;
+    }
+
+    function stepFor(n){ return ({1:1,2:2,3:3,4:4,5:5,6:5,7:3,8:5})[n] || 1; }
+    function updateStepper(n){ const active = stepFor(n); [1,2,3,4,5].forEach(i => { const el = document.getElementById('step-' + i); if(!el) return; el.className = 'step' + (i < active ? ' done' : i === active ? ' active' : ''); }); }
+    function show(n){ [1,2,3,4,5,6,7,8].forEach(x => document.getElementById('s'+x)?.classList.add('hidden')); document.getElementById('s'+n)?.classList.remove('hidden'); updateStepper(n); window.scrollTo({top:0, behavior:'smooth'}); }
+    function selectedClassLabel(){ return state.classOption ? state.classOption.classOptionId : ''; }
+    function selectedSessionLabel(){ return (state.sessions || []).join(' + '); }
+    function updateBadge(){ const parts=[]; if(state.teacher) parts.push(state.teacher.fullName); const cls = selectedClassLabel(); if(cls) parts.push(cls); document.getElementById('ctx-badge').textContent = parts.join(' · ') || 'Teacher Attendance Portal'; }
+
+    let tmr = null;
+    function onTeacherInput(){ clearTimeout(tmr); const q = document.getElementById('teacherQuery').value.trim(); if(q.length < 2){ document.getElementById('teacherList').innerHTML = ''; return; } tmr = setTimeout(() => lookupTeacherForAttendance(q), 250); }
+
+    async function lookupTeacherForAttendance(q){
+      const el = document.getElementById('teacherList');
+      el.innerHTML = '<div class="muted">Searching…</div>';
+      try{
+        const r = await apiGet('lookupTeacherForAttendance', { query:q });
+        state.teachers = r.data || [];
+        el.innerHTML = state.teachers.map(t => `<div class="item" onclick="pickTeacher('${esc(t.teacherId)}')" id="t-${esc(t.teacherId)}"><div class="item-name">${esc(t.fullName)}</div><div class="item-meta">${esc(t.email)} ${esc(t.subGroupLabel || '')}</div></div>`).join('') || '<div class="muted">No matches found.</div>';
+      } catch(e){ el.innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+    }
+
+    function pickTeacher(id){ state.teacher = state.teachers.find(t => t.teacherId === id); [...document.querySelectorAll('#teacherList .item')].forEach(x => x.classList.remove('sel')); document.getElementById('t-'+id)?.classList.add('sel'); document.getElementById('to2').disabled = !state.teacher; updateBadge(); }
+
+    async function toClass(){
+      show(2); document.getElementById('to3').disabled = true;
+      const list = document.getElementById('classList'); list.innerHTML = '<div class="muted">Loading classes…</div>';
+      try{
+        const r = await apiGet('getTeacherActiveClassOptions', { teacherId: state.teacher.teacherId });
+        state.classes = r.data || [];
+        state.classOption = null;
+        list.innerHTML = state.classes.map(c => `<div class="item" onclick="pickClass('${esc(c.classOptionId)}')" id="c-${esc(c.classOptionId)}"><div class="item-name">${esc(c.campus || c.fellowship || c.classOptionId)}</div><div class="item-meta">${esc(c.day)} ${esc(c.time)} · Batch ${esc(c.batch)} · ${Number(c.enrolledCount || 0)} enrolled</div></div>`).join('') || '<div class="muted">No active classes found.</div>';
+      } catch(e){ list.innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+    }
+
+    function pickClass(id){
+      const item = state.classes.find(c => c.classOptionId === id);
+      if(!item) return;
+      state.classOption = item;
+      [...document.querySelectorAll('#classList .item')].forEach(x => x.classList.remove('sel'));
+      document.getElementById('c-'+item.classOptionId)?.classList.add('sel');
+      document.getElementById('to3').disabled = !state.classOption;
+      updateBadge();
+    }
+    function toAction(){ show(3); }
+
+    function chooseAction(type){ state.action = type; document.getElementById('actionMsg').textContent = type === 'attendance' ? 'Attendance flow selected.' : 'Opening Student Progress…'; if(type === 'attendance'){ buildSessions(); state.classDate = new Date().toISOString().slice(0,10); document.getElementById('classDate').value = state.classDate; show(4); } else { window.location.href = `StudentProgressView.html?teacherId=${encodeURIComponent(state.teacher.teacherId)}&classOptionId=${encodeURIComponent(state.classOption.classOptionId)}`; } }
+    function toggleSession(s){
+      const idx = state.sessions.indexOf(s);
+      if (idx >= 0) state.sessions.splice(idx, 1);
+      else {
+        if (state.sessions.length >= 2) { alert('You can select at most two sessions.'); return; }
+        state.sessions.push(s);
+      }
+      renderSessionPickers();
+    }
+    function renderSessionPickers(){
+      const s = document.getElementById('sessionSel');
+      s.innerHTML = SESSIONS.map(x => `<label class="item ${state.sessions.includes(x)?'sel':''}" style="margin-bottom:6px;cursor:pointer" onclick="toggleSession('${x}')"><div class="item-name">${x}</div></label>`).join('');
+    }
+    function buildSessions(){ renderSessionPickers(); }
+
+    async function loadRoster(){
+      if (!state.sessions.length || state.sessions.length > 2) { document.getElementById('already').innerHTML = '<div class="error">Select one or two sessions.</div>'; return; }
+      state.session = state.sessions[0];
+      state.classDate = document.getElementById('classDate').value || new Date().toISOString().slice(0,10);
+      if (!state.classOption) { document.getElementById('already').innerHTML = '<div class="error">Select a class.</div>'; return; }
+      try{
+        const r = await apiGet('loadAttendanceRoster', { teacherId:state.teacher.teacherId, classOptionId:state.classOption.classOptionId, classSession:state.sessions.join(',') });
+        const d = (r && r.data) || {};
+        state.roster = d.roster || [];
+        state.fellowships = d.fellowships || [];
+        const fsel = document.getElementById('enrollFellowship');
+        fsel.innerHTML = '<option value="">Select fellowship</option>' + state.fellowships.map(f => `<option value="${esc(f.code)}">${esc(f.name)}</option>`).join('');
+        state.attendance = {};
+        state.roster.forEach(p => state.attendance[p.id] = false);
+        document.getElementById('already').innerHTML = d.alreadySubmitted ? `<div class="error">${esc(d.previousSubmissionSummary || 'Attendance already submitted today.')}</div>` : '';
+        const ctx = document.getElementById('attendance-context');
+        ctx.classList.remove('hidden');
+        ctx.innerHTML = `<span>Teacher: <span class="ctx-val">${esc(state.teacher.fullName)}</span></span><span class="ctx-sep">›</span><span>Class: <span class="ctx-val">${esc(selectedClassLabel())}</span></span><span class="ctx-sep">›</span><span>Session: <span class="ctx-val">${esc(selectedSessionLabel())}</span></span><span class="ctx-sep">›</span><span>Date: <span class="ctx-val">${esc(state.classDate)}</span></span>`;
+        show(5); renderRoster();
+      } catch(e){ document.getElementById('already').innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+    }
+
+    function renderRoster(){
+      const q = (document.getElementById('rosterSearch').value || '').toLowerCase();
+      const rows = state.roster.filter(r => !q || String(r.fullName || '').toLowerCase().includes(q) || String(r.email || '').toLowerCase().includes(q));
+      document.getElementById('roster').innerHTML = rows.map(r => `<div class="item ${state.attendance[r.id] ? 'sel' : ''}" onclick="toggle('${esc(r.id)}')"><div class="roster-item"><div class="roster-main"><div class="item-name">${esc(r.fullName)} <span class="item-meta">(${esc(r.personType)})</span></div><div class="item-meta">${esc(r.email || '')} · ${esc(r.status || '')}</div></div><div class="roster-status">${state.attendance[r.id] ? 'Present' : 'Absent'}</div></div></div>`).join('') || '<div class="muted">No roster records found.</div>';
+      updateCounts();
+    }
+
+    function updateCounts(){ const total = state.roster.length; const present = state.roster.filter(r => state.attendance[r.id]).length; const absent = total - present; document.getElementById('count-present').textContent = present; document.getElementById('count-absent').textContent = absent; document.getElementById('count-total').textContent = total; }
+    function toggle(id){ state.attendance[id] = !state.attendance[id]; renderRoster(); }
+    function markAll(v){ state.roster.forEach(r => state.attendance[r.id] = v); renderRoster(); }
+
+    function review(){ const records = state.roster.map(p => ({ personId:p.id, studentId:p.studentId||'', applicantId:p.applicantId||'', personType:p.personType, fullName:p.fullName, email:p.email, fellowshipCode:p.fellowshipCode||'', sourceClassOptionId:p.sourceClassOptionId || (state.classOption ? state.classOption.classOptionId : ''), sourceSession:p.sourceSession || '', attendanceStatus:state.attendance[p.id] ? 'Present' : 'Absent', source:p.source || '' })); state.lastRecords = records; const present = records.filter(r => r.attendanceStatus === 'Present').length; const absent = records.length - present; document.getElementById('reviewBox').innerHTML = `<div class="ok">${esc(selectedClassLabel())} · ${esc(selectedSessionLabel())} · ${esc(state.classDate)}</div><div class="stats"><div class="stat"><div class="stat-value" style="color:var(--success)">${present}</div><div class="stat-label">Present</div></div><div class="stat"><div class="stat-value" style="color:var(--danger)">${absent}</div><div class="stat-label">Absent</div></div><div class="stat"><div class="stat-value" style="color:var(--primary)">${records.length}</div><div class="stat-label">Total</div></div></div>`; show(6); }
+
+    async function submitTeacherAttendance(){
+      const btn = document.getElementById('submitBtn'); btn.disabled = true;
+      try{
+        await apiPost('submitTeacherAttendance', { teacherId:state.teacher.teacherId, teacherName:state.teacher.fullName, classOptionId:state.classOption.classOptionId, classSession:state.sessions.join(','), classDate:state.classDate, records:state.lastRecords });
+        state.attendanceSubmitted = true;
+        document.getElementById('submitMsg').innerHTML = `<div class="ok">${esc(selectedClassLabel())} attendance submitted.</div>`;
+        await loadMilestonesAfterAttendance();
+      } catch(e){ document.getElementById('submitMsg').innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+      finally{ btn.disabled = false; }
+    }
+
+    async function loadMilestonesAfterAttendance(){ try{ const r = await apiGet('getMilestonesForSession', { classSession:state.sessions[0] || 'Class1' }); state.milestones = r.data || []; if(!state.milestones.length){ resetAfterSuccess(); return; } renderOutcomeStep(); show(8); } catch(e){ document.getElementById('submitMsg').innerHTML = `<div class="error">${esc(e.message)}</div>`; } }
+
+    function renderOutcomeStep(){ const presentPeople = state.roster.filter(p => state.attendance[p.id]); if(!presentPeople.length){ document.getElementById('outcomesBox').innerHTML = '<div class="muted">No present participants to record outcomes.</div>'; return; } let html = ''; presentPeople.forEach((p,pi) => { html += `<div class="item sel"><div class="item-name">${esc(p.fullName)} <span class="item-meta">(${esc(p.personType)})</span></div>`; state.milestones.forEach((m,mi) => { html += `<div class="field" style="margin-top:12px"><label>${esc(m.question)}</label><select id="out-${pi}-${mi}"><option value="">Not marked</option><option value="Yes">Yes</option><option value="No">No</option></select></div>`; }); html += '</div>'; }); document.getElementById('outcomesBox').innerHTML = html; }
+
+    async function submitSessionOutcomes(submitted){
+      try{
+        const presentPeople = state.roster.filter(p => state.attendance[p.id]);
+        const entries = [];
+        presentPeople.forEach((p,pi) => { state.milestones.forEach((m,mi) => { entries.push({ studentId:p.id, personType:p.personType, fullName:p.fullName, email:p.email, milestoneId:m.milestoneId, question:m.question, outcomeResult:(document.getElementById(`out-${pi}-${mi}`)?.value || '') }); }); });
+        await apiPost('submitSessionOutcomes', { teacherId:state.teacher.teacherId, teacherName:state.teacher.fullName, classOptionId:state.classOption.classOptionId, classSession:state.session, classDate:state.classDate, submitted:submitted, entries:entries });
+        document.getElementById('outcomeMsg').innerHTML = '<div class="ok">Outcomes saved.</div>';
+        resetAfterSuccess();
+      } catch(e){ document.getElementById('outcomeMsg').innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+    }
+
+    function resetAfterSuccess(){ state.roster=[]; state.attendance={}; state.addResults=[]; state.milestones=[]; state.lastRecords=[]; document.getElementById('rosterSearch').value=''; document.getElementById('addQ').value=''; document.getElementById('addList').innerHTML=''; document.getElementById('outcomesBox').innerHTML=''; document.getElementById('outcomeMsg').innerHTML=''; updateCounts(); setTimeout(() => show(2), 450); }
+
+    function openAdd(){
+      document.getElementById('addModal').classList.remove('hidden');
+      document.getElementById('addBackdrop').classList.remove('hidden');
+      document.getElementById('addQ').value='';
+      document.getElementById('addList').innerHTML='';
+      const hasClass1 = state.sessions.includes('Class1');
+      const hasOther = state.sessions.some(s => s !== 'Class1');
+      document.getElementById('addSubtitle').textContent = hasClass1 && hasOther ? 'Search applicants or students by name or email.' : (hasClass1 ? 'Search applicants by name or email.' : 'Search students by name or email.');
+    }
+    function closeAdd(){ document.getElementById('addModal').classList.add('hidden'); document.getElementById('addBackdrop').classList.add('hidden'); document.getElementById('enrollBox').classList.add('hidden'); }
+
+    let addT = null;
+    function searchAttendancePerson(){
+      clearTimeout(addT);
+      const q = document.getElementById('addQ').value.trim();
+      document.getElementById('enrollBox').classList.add('hidden');
+      if(q.length < 2){ document.getElementById('addList').innerHTML = ''; return; }
+      addT = setTimeout(async () => {
+        try{
+          const r = await apiGet('searchAttendancePerson', { query:q, classOptionId:state.classOption.classOptionId, teacherId:state.teacher.teacherId, classSession:state.sessions.join(',') });
+          state.addResults = r.data || [];
+          if (!state.addResults.length) {
+            document.getElementById('addList').innerHTML = '<div class="muted">No matches found. You can enroll a new student below.</div>';
+            document.getElementById('enrollBox').classList.remove('hidden');
+            document.getElementById('enrollName').value = q.includes('@') ? '' : q;
+            document.getElementById('enrollEmail').value = q.includes('@') ? q : '';
+          } else {
+            document.getElementById('addList').innerHTML = state.addResults.map((p,i) => `<div class="item" onclick="addPersonByIndex(${i})"><div class="item-name">${esc(p.fullName)}</div><div class="item-meta">${esc(p.email || '')} · ${esc(p.personType)}${p.classOptionId ? ' · ' + esc(p.classOptionId) : ''}</div></div>`).join('');
+          }
+        } catch(e){ document.getElementById('addList').innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+      }, 250);
+    }
+    function addPersonByIndex(i){
+      const p = state.addResults[i];
+      if(!p) return;
+      const sourceClassOptionId = p.sourceClassOptionId || (state.classOption ? state.classOption.classOptionId : '');
+      const row = Object.assign({}, p, { sourceClassOptionId: sourceClassOptionId });
+      if(!state.roster.find(x => x.id === row.id)) state.roster.push(row);
+      state.attendance[row.id] = true;
+      closeAdd();
+      renderRoster();
+    }
+    function enrollAndAdd(){
+      const fullName = (document.getElementById('enrollName').value || '').trim();
+      const email = (document.getElementById('enrollEmail').value || '').trim();
+      const phone = (document.getElementById('enrollPhone').value || '').trim();
+      const fellowshipCode = (document.getElementById('enrollFellowship').value || '').trim();
+      if(!fullName || !email){ alert('Full name and email are required.'); return; }
+      if(!fellowshipCode){ alert('Select a fellowship before enrollment.'); return; }
+      const tmpId = 'ENROLL-' + Date.now();
+      const row = { id: tmpId, studentId:'', applicantId:'', fullName, email, phone, fellowshipCode, personType:'Student', status:'Active', classOptionId:(state.classOption ? state.classOption.classOptionId : ''), sourceClassOptionId:(state.classOption ? state.classOption.classOptionId : ''), source:'Teacher Enrolled' };
+      if(!state.roster.find(x => x.id === row.id)) state.roster.push(row);
+      state.attendance[row.id] = true;
+      closeAdd();
+      renderRoster();
+    }
+
+    show(1);
+  </script>
+</body>
+</html>
+
+

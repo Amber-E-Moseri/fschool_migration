@@ -1,0 +1,409 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="teacher-availability-api-url" content="https://script.google.com/macros/s/AKfycbwQQhGZvLcX689zhC6kL9RgbubHGbh8FFMCoO2zSXBrNn21WIUGmPP_xPXa06QOHb00nA/exec" />
+  <title>Rock Solid - Teacher Availability</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --navy:#3D2A8A;
+      --lilacSoft:#EDE9FA;
+      --gold:#F5A623;
+      --ink:#1E1535;
+      --muted:#7C6FA0;
+      --border:#E8E6F0;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:#F7F6FB;color:var(--ink);font-family:'DM Sans',system-ui,-apple-system,sans-serif}
+    .rs-nav{
+      position:sticky;top:0;z-index:70;background:#fff;border-bottom:1px solid var(--border)
+    }
+    .rs-nav__inner{max-width:1240px;margin:0 auto;padding:10px 24px;display:flex;gap:8px;align-items:center}
+    .rs-nav__link{
+      display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;
+      border:1px solid transparent;text-decoration:none;font-size:12px;font-weight:700;color:var(--muted)
+    }
+    .rs-nav__link:hover{background:var(--lilacSoft);color:var(--navy)}
+    .rs-nav__link.is-active{background:var(--lilacSoft);border-color:var(--lilacMid);color:var(--navy)}
+    .rs-nav__icon{font-size:14px;line-height:1}
+    @media(max-width:600px){
+      .rs-nav__label{display:none}
+      .rs-nav__inner{padding:10px 12px}
+      .rs-nav__link{padding:8px 10px}
+    }
+    .wrap{max-width:1240px;margin:0 auto;padding:24px}
+    .title{font-size:26px;font-weight:800;margin:6px 0 2px;color:var(--navy)}
+    .sub{font-size:13px;color:var(--muted)}
+    .card{background:#fff;border:1px solid var(--border);border-radius:10px}
+    .p{padding:14px}.mb{margin-bottom:12px}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:12px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    input,select,button{font:inherit}
+    input,select{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink);outline:none;transition:border-color .15s}
+    input:focus,select:focus{border-color:var(--navy)}
+    .btn{padding:9px 16px;border:0;border-radius:8px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:12px;color:var(--ink)}
+    .pill:hover{border-color:var(--navy);color:var(--navy)}
+    .pill.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .badge{padding:1px 5px;border-radius:4px;font-size:10px;background:#EDE9FA;color:var(--navy);font-weight:700}
+    .pill.active .badge{background:rgba(255,255,255,.2);color:#fff}
+    .days{display:grid;grid-template-columns:80px repeat(7,1fr);background:#F7F6FB;border-bottom:1px solid var(--border)}
+    .days div{padding:7px;text-align:center;font-size:11px;font-weight:700;border-left:1px solid var(--border);color:var(--navy)}
+    .days div:first-child{text-align:left;border-left:0;color:var(--muted)}
+    .slot{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid var(--border)}
+    .time{padding:8px;background:#F7F6FB;font-size:11px;color:var(--muted);font-weight:600}
+    .cell{min-height:38px;border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;font-size:12px;transition:background .1s}
+    .cell:hover{background:var(--lilacSoft)}
+    .cell.on{background:#FEF6E4;color:#7A5A00;font-weight:700;border-left-color:var(--gold)}
+    .warn,.err,.ok{padding:10px;border-radius:8px;font-size:13px}
+    .warn{background:#FEF6E4;border:1px solid #F5D78A;color:#7A5A00}
+    .err{background:#FFF0F0;border:1px solid #F2B2B2;color:#8C1F1F}
+    .ok{background:#ECFDF3;border:1px solid #9AE6B4;color:#276749}
+    .modal{position:fixed;inset:0;background:rgba(30,21,53,.4);display:none;align-items:center;justify-content:center;padding:16px}
+    .modal.open{display:flex}
+    .modal-card{width:100%;max-width:600px;max-height:90vh;overflow:auto}
+    .suggestions{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+    label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+    strong{color:var(--navy)}
+    @media(max-width:980px){.grid{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<nav class="rs-nav" aria-label="Teacher Portal Navigation">
+  <div class="rs-nav__inner">
+    <div class="rs-nav__brand">RS</div>
+    <a class="rs-nav__link" href="TeacherAttendancePortal.html">
+      <span class="rs-nav__icon">&#x2705;</span>
+      <span class="rs-nav__label">Attendance</span>
+    </a>
+    <a class="rs-nav__link" href="StudentProgressView.html">
+      <span class="rs-nav__icon">&#x1F4CA;</span>
+      <span class="rs-nav__label">Student Progress</span>
+    </a>
+    <a class="rs-nav__link is-active" href="teacher-schedule.html">
+      <span class="rs-nav__icon">&#x1F4C5;</span>
+      <span class="rs-nav__label">My Schedule</span>
+    </a>
+  </div>
+</nav>
+<main class="wrap">
+  <div class="pill" style="background:var(--lilacSoft);border-color:transparent;color:var(--navy);font-weight:700;margin-bottom:6px">Rock Solid Scheduler</div>
+  <h1 class="title">Teacher Availability</h1>
+  <div class="sub mb">Select times in your timezone. We automatically convert them for each campus timezone.</div>
+  <div id="notice" class="warn mb" style="display:none"></div>
+  <div id="error" class="err mb" style="display:none"></div>
+  <div id="ok" class="ok mb" style="display:none"></div>
+
+  <div class="grid">
+    <section>
+      <div class="card p mb">
+        <div class="grid2">
+          <div>
+            <label>Teacher Name</label>
+            <input id="teacherName" placeholder="Type your full name" />
+            <div id="nameHint" class="sub" style="margin-top:4px"></div>
+            <div id="nameSuggestions" class="suggestions"></div>
+          </div>
+          <div><label>Teacher Email</label><input id="teacherEmail" placeholder="name@foundationschool.org" /></div>
+          <div>
+            <label>Teacher Timezone</label>
+            <select id="teacherTimezone"></select>
+          </div>
+          <div><label>Month</label><select id="month"></select></div>
+        </div>
+      </div>
+
+      <div class="card p mb">
+        <div style="display:flex;justify-content:space-between;align-items:center"><strong>Campuses</strong><span id="campusMeta" class="sub"></span></div>
+        <input id="campusSearch" placeholder="Search campus name or code..." style="margin:10px 0" />
+        <div id="campusGroups"></div>
+      </div>
+
+      <div id="tzNotice" class="warn mb">You are selecting availability in your own timezone. Selected times will automatically be converted into each campus's local timezone.</div>
+      <div id="multiCampusNotice" class="warn mb" style="display:none"></div>
+
+      <div class="card mb">
+        <div class="p" style="display:flex;justify-content:space-between;align-items:center"><strong id="gridTitle">Weekly Grid</strong><span class="sub" id="gridTzLabel"></span></div>
+        <div id="gridWrap"></div>
+      </div>
+
+      <div class="card p" style="display:flex;justify-content:space-between;align-items:center">
+        <span id="selStats" class="sub">0 slots selected</span>
+        <button id="review" class="btn" disabled>Review &amp; Submit</button>
+      </div>
+    </section>
+
+    <aside class="card p">
+      <div style="display:flex;justify-content:space-between;align-items:center"><strong>Summary</strong><span id="sumTotal" class="sub"></span></div>
+      <div id="summary" style="margin-top:10px"></div>
+    </aside>
+  </div>
+</main>
+
+<div id="modal" class="modal">
+  <div class="card p modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;color:var(--navy)">Review &amp; Submit</h3><button id="close" class="pill">Close</button></div>
+    <p class="sub">Confirm converted campus times before submitting.</p>
+    <div id="reviewContent"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span id="submitState" class="sub"></span><button id="submit" class="btn">Confirm Submit</button></div>
+  </div>
+</div>
+
+<script>
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const SLOTS=["6:00 AM","7:00 AM","8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM","6:00 PM","7:00 PM","8:00 PM","9:00 PM","10:00 PM"];
+const SUBGROUP_LABELS={CESGA:"Prairies (MB / SK)",CESGB:"Atlantic Canada",CSGA:"GTA, Ottawa & Québec",CSGB:"Waterloo & West GTA",WSGA:"Alberta & BC",WSGB:"Southern Alberta"};
+const FALLBACK_CAMPUSES=[
+  {code:"YORK",campusName:"York University",groupID:"CS",subgroupID:"CSGA",timezone:"America/Toronto"},
+  {code:"UTM",campusName:"University of Toronto Mississauga",groupID:"CS",subgroupID:"CSGB",timezone:"America/Toronto"},
+  {code:"UALBERTA",campusName:"University of Alberta",groupID:"WS",subgroupID:"WSGA",timezone:"America/Edmonton"},
+  {code:"MUN",campusName:"Memorial University",groupID:"CE",subgroupID:"CESGB",timezone:"America/St_Johns"}
+];
+const TZ_OPTIONS=["America/Toronto","America/Edmonton","America/Vancouver","America/Regina","America/Winnipeg","America/Halifax","America/St_Johns","UTC"];
+const state={campuses:[],teachers:[],campusSource:"live",selectedCampusCodes:new Set(),activeCampusCode:"",slotSet:new Set(),search:"",
+teacherName:"",teacherEmail:"",teacherTimezone:"",monthKey:"",submitting:false,occupiedByCampus:{},emailTouched:false,campusDebug:null,selectedTeacher:null,conflictCache:{},conflictDebounceTimer:null,conflictLoading:false};
+const apiUrl=(document.querySelector('meta[name="teacher-availability-api-url"]')?.content||"").trim();
+const apiToken=(document.querySelector('meta[name="teacher-availability-api-token"]')?.content||"").trim();
+const unresolvedApi=!apiUrl||apiUrl==="__TEACHER_AVAILABILITY_API_URL__";
+const el=id=>document.getElementById(id); const norm=s=>String(s||"").trim().replace(/\s+/g," ").toLowerCase();
+const show=(id,msg)=>{const n=el(id);n.style.display=msg?"block":"none";n.textContent=msg||""};
+const slotKey=(d,t)=>`${d}__${t}`; const splitKey=k=>{const [day,time]=String(k).split("__");return{day,time}};
+const monthOptions=(n=6)=>Array.from({length:n},(_,i)=>{const d=new Date(new Date().getFullYear(),new Date().getMonth()+i,1);return{key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("en-US",{month:"long",year:"numeric"}),month:d.toLocaleDateString("en-US",{month:"long"}),year:d.getFullYear(),monthIndex:d.getMonth()+1}});
+function selectedMonth(){return monthOptions(6).find(m=>m.key===state.monthKey)||monthOptions(6)[0]}
+function campusBy(code){return state.campuses.find(c=>c.code===code)}
+function totalSlots(){return state.slotSet.size}
+function dayIdx(day){return DAYS.indexOf(day)}
+function parseTime12h(v){const m=String(v).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i); if(!m)return null; let h=Number(m[1]); const mi=Number(m[2]); const ap=m[3].toUpperCase(); if(ap==="PM"&&h<12)h+=12; if(ap==="AM"&&h===12)h=0; return {h,mi};}
+function weekdayDateInMonth(year,monthIndex,weekdayName){const first=new Date(year,monthIndex-1,1); const firstIdx=(first.getDay()+6)%7; const target=dayIdx(weekdayName); const delta=(target-firstIdx+7)%7; return 1+delta;}
+function getTzOffsetMs(instant,timeZone){const dtf=new Intl.DateTimeFormat("en-US",{timeZone,hour12:false,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}); const p=Object.fromEntries(dtf.formatToParts(instant).map(x=>[x.type,x.value])); const asUtc=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute),Number(p.second)); return asUtc-instant.getTime();}
+function wallClockToInstant(year,monthIndex,dayOfMonth,hour,minute,timeZone){const naive=Date.UTC(year,monthIndex-1,dayOfMonth,hour,minute,0); const off1=getTzOffsetMs(new Date(naive),timeZone); const adj=naive-off1; const off2=getTzOffsetMs(new Date(adj),timeZone); return new Date(off1===off2?adj:adj-off2+off1);}
+function convertTeacherSlotToCampus(slot,teacherTz,campusTz){const m=selectedMonth(); const t=parseTime12h(slot.time); if(!t) return {campusDay:slot.day,campusTime:slot.time}; const dom=weekdayDateInMonth(m.year,m.monthIndex,slot.day); const instant=wallClockToInstant(m.year,m.monthIndex,dom,t.h,t.mi,teacherTz); const parts=new Intl.DateTimeFormat("en-US",{timeZone:campusTz,weekday:"long",hour:"numeric",minute:"2-digit",hour12:true}).formatToParts(instant); const campusDay=(parts.find(p=>p.type==="weekday")||{}).value||slot.day; const hr=(parts.find(p=>p.type==="hour")||{}).value||""; const mi=(parts.find(p=>p.type==="minute")||{}).value||"00"; const dp=((parts.find(p=>p.type==="dayPeriod")||{}).value||"").toUpperCase(); return {campusDay,campusTime:`${hr}:${mi} ${dp}`};}
+
+async function apiGet(action){if(unresolvedApi) throw new Error("Scheduler is not connected yet. Please add the Apps Script Web App URL."); const u=new URL(apiUrl); u.searchParams.set("action",action); if(apiToken) u.searchParams.set("token",apiToken); const res=await fetch(u.toString()); const json=await res.json(); if(!res.ok||!json||json.ok===false) throw new Error((json&&json.error)||`${action} failed (${res.status})`); return json;}
+async function apiPost(action, body){if(unresolvedApi) throw new Error("Scheduler is not connected yet. Please add the Apps Script Web App URL."); const u=new URL(apiUrl); u.searchParams.set("action",action); if(apiToken) u.searchParams.set("token",apiToken); const reqBody=Object.assign({}, body||{}); if(apiToken) reqBody.token=apiToken; const res=await fetch(u.toString(),{method:"POST",body:JSON.stringify(reqBody)}); const json=await res.json(); if(!res.ok||!json||json.ok===false) throw new Error((json&&json.error)||`${action} failed (${res.status})`); return json;}
+async function initTeachers(){
+  try{
+    const json=await apiGet("getTeachers");
+    state.teachers=Array.isArray(json.data)?json.data:[];
+    console.log("[TA DEBUG] teachersLoaded count:", state.teachers.length);
+  }catch(e){
+    state.teachers=[];
+    console.error("[TA DEBUG] getTeachers failed:", e);
+  }
+}
+async function initCampuses(){
+  let debugMsg = "";
+  try{
+    const json=await apiGet("getCampuses");
+    const live=Array.isArray(json.data)?json.data:[];
+    if(live.length){
+      state.campuses=live.map(c=>({code:String(c.code||"").trim(),campusName:String(c.campusName||"").trim(),groupID:String(c.groupID||"").trim(),subgroupID:String(c.subgroupID||"").trim(),timezone:String(c.timezone||"").trim()||"America/Toronto"}));
+      state.campusSource="live";
+      console.log("[TA DEBUG] campusesLoaded count:", state.campuses.length);
+    } else {
+      try {
+        const dbg = await apiGet("debugCampuses");
+        state.campusDebug = dbg && dbg.data ? dbg.data : null;
+        if (state.campusDebug) {
+          const d = state.campusDebug;
+          debugMsg = ` rowsRead=${d.rowsRead||0}, included=${d.rowsIncluded||0}, skipped=${d.rowsSkipped||0}, reasons=${JSON.stringify(d.skippedReasons||{})}`;
+        }
+      } catch (_) {}
+      throw new Error("Live campus list returned empty." + debugMsg);
+    }
+  }catch(e){
+    state.campuses=[...FALLBACK_CAMPUSES];
+    state.campusSource="fallback";
+    show("notice","Using saved campus list. Live sheet data could not be loaded. " + String((e&&e.message)||e||""));
+  }
+  state.campuses.sort((a,b)=>a.campusName.localeCompare(b.campusName));
+  if (!state.campusDebug) {
+    try { const dbg = await apiGet("debugCampuses"); state.campusDebug = dbg && dbg.data ? dbg.data : null; } catch (_) { state.campusDebug = null; }
+  }
+  if(state.activeCampusCode && !state.campuses.some(c=>c.code===state.activeCampusCode)){
+    state.activeCampusCode="";
+  }
+  scheduleConflictRefresh();
+  render();}
+
+function conflictCacheKey(){
+  const m=selectedMonth();
+  const codes=[...state.selectedCampusCodes].map(c=>String(c||"").trim()).sort().join(",");
+  return `${m.month}|${m.year}|${codes}`;
+}
+
+async function refreshConflicts(){
+  if(unresolvedApi){ state.occupiedByCampus = {}; return; }
+  const key=conflictCacheKey();
+  if(state.conflictCache[key]){
+    state.occupiedByCampus=state.conflictCache[key];
+    return;
+  }
+  const m = selectedMonth();
+  const selected = [...state.selectedCampusCodes];
+  const out = {};
+  selected.forEach(c=>{out[c]=new Set();});
+  if(!selected.length){state.occupiedByCampus=out;return;}
+  const u=new URL(apiUrl);
+  u.searchParams.set("action","getSchedulesForCampuses");
+  u.searchParams.set("campusCodes",selected.join(","));
+  u.searchParams.set("month",m.month);
+  u.searchParams.set("year",String(m.year));
+  if(apiToken) u.searchParams.set("token", apiToken);
+  const res=await fetch(u.toString());
+  const json=await res.json();
+  if(!res.ok||!json||json.ok===false) throw new Error((json&&json.error)||`getSchedulesForCampuses failed (${res.status})`);
+  const byCampus=(json&&json.data)||{};
+  selected.forEach(code=>{
+    const rows=Array.isArray(byCampus[code])?byCampus[code]:[];
+    out[code]=new Set(rows.map(r=>`${String(r.classDay||"").trim()}__${String(r.classTime||"").trim()}`).filter(Boolean));
+  });
+  state.occupiedByCampus = out;
+  state.conflictCache[key]=out;
+}
+
+function scheduleConflictRefresh(){
+  if(state.conflictDebounceTimer) clearTimeout(state.conflictDebounceTimer);
+  state.conflictDebounceTimer=setTimeout(async()=>{
+    state.conflictLoading=true;
+    try{await refreshConflicts();}catch(e){console.error("[TA DEBUG] conflict refresh failed:",e);}
+    finally{state.conflictLoading=false;render();}
+  },250);
+}
+
+function isConflictForCampusSlot(campusCode, day, time){
+  const campus = campusBy(campusCode);
+  if(!campus) return false;
+  const conv = convertTeacherSlotToCampus({day,time}, state.teacherTimezone || "America/Toronto", campus.timezone || "America/Toronto");
+  const key = `${conv.campusDay}__${conv.campusTime}`;
+  const set = state.occupiedByCampus[campusCode];
+  return !!(set && set.has(key));
+}
+
+function selectTeacherMatch(match){
+  state.selectedTeacher=match||null;
+  console.log("[TA DEBUG] selected teacher object:", state.selectedTeacher);
+  if(!state.emailTouched || !el("teacherEmail").value.trim()){
+    el("teacherEmail").value=match.teacherEmail||"";
+    state.teacherEmail=match.teacherEmail||"";
+  }
+  if(match.teacherTimezone){
+    el("teacherTimezone").value=match.teacherTimezone;
+    state.teacherTimezone=match.teacherTimezone;
+    el("nameHint").textContent="Matched teacher. Email and timezone auto-filled.";
+  }else{
+    el("nameHint").textContent="Timezone missing for this teacher. Please select your timezone.";
+  }
+}
+function applyTeacherMatch(){
+  const hint=el("nameHint"),sug=el("nameSuggestions");
+  hint.textContent="";sug.innerHTML="";
+  const input=norm(state.teacherName);
+  if(!input||!state.teachers.length) return;
+  const exact=state.teachers.filter(t=>norm(t.teacherName)===input);
+  if(exact.length===1){selectTeacherMatch(exact[0]); return;}
+  const partial=state.teachers.filter(t=>{
+    const n=norm(t.teacherName), e=norm(t.teacherEmail);
+    return n.includes(input)||e.includes(input);
+  }).slice(0,8);
+  if(exact.length>1){
+    hint.textContent="Multiple exact matches found. Choose one:";
+    sug.innerHTML=exact.map((m,i)=>`<button class="pill" data-mi="${i}">${m.teacherName} - ${m.teacherEmail}</button>`).join("");
+    sug.querySelectorAll("[data-mi]").forEach((b,i)=>b.onclick=()=>{selectTeacherMatch(exact[i]);sug.innerHTML="";});
+    return;
+  }
+  if(partial.length){
+    hint.textContent="Possible matches:";
+    sug.innerHTML=partial.map((m,i)=>`<button class="pill" data-pi="${i}">${m.teacherName} - ${m.teacherEmail}</button>`).join("");
+    sug.querySelectorAll("[data-pi]").forEach((b,i)=>b.onclick=()=>{el("teacherName").value=partial[i].teacherName||"";state.teacherName=partial[i].teacherName||"";selectTeacherMatch(partial[i]);sug.innerHTML="";render();});
+  }
+}
+
+function renderCampusGroups(){const search=state.search.toLowerCase(); const filtered=state.campuses.filter(c=>!search||c.campusName.toLowerCase().includes(search)||c.code.toLowerCase().includes(search)); const groups={}; filtered.forEach(c=>{const g=c.groupID||"UNGROUPED"; const s=c.subgroupID||"OTHER"; groups[g]=groups[g]||{}; groups[g][s]=groups[g][s]||[]; groups[g][s].push(c);});
+  const wrap=el("campusGroups"); wrap.innerHTML=Object.keys(groups).sort().map(g=>`<div style="margin-bottom:12px"><div class="sub" style="font-weight:800;color:var(--navy);font-size:12px;letter-spacing:.5px">${g}</div>${Object.keys(groups[g]).sort().map(sub=>`<div style="margin-top:6px"><div class="sub" style="font-weight:700;color:var(--navy);font-size:11px;text-transform:uppercase;letter-spacing:.5px">${sub}${SUBGROUP_LABELS[sub]?` · ${SUBGROUP_LABELS[sub]}`:""}</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${groups[g][sub].map(c=>{const a=state.selectedCampusCodes.has(c.code); const n=a?state.slotSet.size:0; return `<button class="pill ${a?'active':''}" data-campus="${c.code}">${c.code}<span class="badge">${n}</span></button>`;}).join("")}</div></div>`).join("")}</div>`).join("")||`<div class="sub">No campuses match your search.</div>`;
+  wrap.querySelectorAll("[data-campus]").forEach(btn=>btn.onclick=()=>{const code=btn.getAttribute("data-campus"); if(state.selectedCampusCodes.has(code)){state.selectedCampusCodes.delete(code); if(state.activeCampusCode===code) state.activeCampusCode=[...state.selectedCampusCodes][0]||"";} else {state.selectedCampusCodes.add(code); state.activeCampusCode=code;} scheduleConflictRefresh(); render();});
+  const shown=filtered.length;
+  const total=state.campuses.length;
+  const hiddenInfo=(state.campusDebug&&state.campusDebug.rowsSkipped>0)?` Some fellowships may be hidden because Active is explicitly FALSE/No/0 or required fields are missing.`:"";
+  el("campusMeta").textContent=`${state.selectedCampusCodes.size} selected • Showing ${shown} active fellowships${shown!==total?` of ${total}`:""} • source: ${state.campusSource}${hiddenInfo}`;
+}
+
+function renderGrid(){const campus=campusBy(state.activeCampusCode); el("gridTitle").textContent=campus?`${campus.code} - ${campus.campusName}`:"Weekly Grid"; el("gridTzLabel").textContent=`Grid shown in teacher timezone: ${state.teacherTimezone||"(select timezone)"}`;
+  if(campus) console.log("[TA DEBUG] selected campus timezone:", campus.timezone || "");
+  if(!state.activeCampusCode){el("gridWrap").innerHTML=`<div class="p sub">Select at least one campus.</div>`; return;}
+  let html=`<div class="days"><div>Time</div>${DAYS.map(d=>`<div>${d.slice(0,3)}</div>`).join("")}</div>`;
+  SLOTS.forEach(t=>{html+=`<div class="slot"><div class="time">${t}</div>`; DAYS.forEach(d=>{const k=slotKey(d,t); const blocked=isConflictForCampusSlot(state.activeCampusCode,d,t); html+=`<div class="cell ${state.slotSet.has(k)?'on':''}" style="${blocked?'opacity:.4;cursor:not-allowed;background:#f2f2f2;':''}" data-day="${d}" data-time="${t}" data-blocked="${blocked?'1':'0'}" title="${blocked?'Already scheduled in this campus at this local time':''}">${state.slotSet.has(k)?"✓":""}</div>`;}); html+=`</div>`;});
+  el("gridWrap").innerHTML=html; el("gridWrap").querySelectorAll(".cell").forEach(n=>n.onclick=()=>{if(n.getAttribute("data-blocked")==="1") return; const k=slotKey(n.getAttribute("data-day"),n.getAttribute("data-time")); if(state.slotSet.has(k)) state.slotSet.delete(k); else state.slotSet.add(k); render();});
+}
+
+function convertedCampusSlots(campus){return [...state.slotSet].map(k=>{const s=splitKey(k); const conv=convertTeacherSlotToCampus(s,state.teacherTimezone,campus.timezone); return {teacherDay:s.day,teacherTime:s.time,campusDay:conv.campusDay,campusTime:conv.campusTime};});}
+
+function renderSummary(){const selected=state.campuses.filter(c=>state.selectedCampusCodes.has(c.code)); el("summary").innerHTML=`<div class="sub mb"><strong>Teacher Timezone:</strong> ${state.teacherTimezone||"-"}</div>` + (selected.map(c=>{const items=convertedCampusSlots(c); return `<div class="mb"><strong>${c.code}</strong> <span class="sub">${c.campusName} • ${c.timezone}</span><div style="margin-top:4px">${items.map(it=>`<span class="pill" style="padding:2px 8px;font-size:11px">${it.campusDay.slice(0,3)} ${it.campusTime}</span>`).join("")||`<span class="sub">No slots</span>`}</div></div>`;}).join("")||`<span class="sub">No campuses selected.</span>`);
+  el("sumTotal").textContent=`${totalSlots()} teacher-time slots`;
+}
+
+function buildRecords(){const m=selectedMonth(); const records=[]; const ts=new Date().toISOString(); [...state.selectedCampusCodes].forEach(code=>{const c=campusBy(code); if(!c) return; convertedCampusSlots(c).forEach(it=>records.push({teacherName:state.teacherName.trim(),teacherEmail:state.teacherEmail.trim(),teacherTimezone:state.teacherTimezone,
+  teacherDay:it.teacherDay,teacherTime:it.teacherTime,campusCode:c.code,campusName:c.campusName,campusTimezone:c.timezone,campusDay:it.campusDay,campusTime:it.campusTime,
+  fellowshipCode:c.code,day:it.teacherDay,time:it.teacherTime,
+  groupID:c.groupID,subgroupID:c.subgroupID,month:m.month,year:m.year,status:"PENDING",adminApproved:false,submittedAt:ts}));}); return records;}
+
+function renderReview(){const records=buildRecords(); const byCampus={}; records.forEach(r=>{byCampus[r.campusCode]=byCampus[r.campusCode]||{campusName:r.campusName,campusTimezone:r.campusTimezone,items:[]}; byCampus[r.campusCode].items.push(r);});
+  el("reviewContent").innerHTML=`<div class="sub mb"><strong>Name:</strong> ${state.teacherName||"-"}<br><strong>Email:</strong> ${state.teacherEmail||"-"}<br><strong>Teacher Timezone:</strong> ${state.teacherTimezone||"-"}</div>` + Object.keys(byCampus).map(code=>`<div class="mb"><strong>${code} - ${byCampus[code].campusName}</strong> <span class="sub">(${byCampus[code].campusTimezone})</span><div style="margin-top:4px">${byCampus[code].items.map(it=>`<span class="pill" style="padding:2px 8px;font-size:11px">${it.campusDay.slice(0,3)} ${it.campusTime}</span>`).join("")}</div></div>`).join("");
+}
+
+async function submitAvailability(){show("error",""); show("ok",""); const records=buildRecords();
+  if(!state.teacherName.trim()||!state.teacherEmail.trim()) return show("error","Please enter teacher name and email.");
+  if(!state.teacherTimezone) return show("error","Please select teacher timezone.");
+  if(totalSlots()===0) return show("error","Select at least one slot before submitting.");
+  if(unresolvedApi) return show("error","Scheduler is not connected yet. Please add the Apps Script Web App URL.");
+  state.submitting=true; el("submit").disabled=true; el("submitState").textContent="Submitting...";
+  try{
+    const m = selectedMonth();
+    const slots = [];
+    [...state.selectedCampusCodes].forEach(code => {
+      [...state.slotSet].forEach(k => {
+        const s = splitKey(k);
+        slots.push({ campusCode: code, teacherDay: s.day, teacherTime: s.time });
+      });
+    });
+    const payload={
+      teacherName: state.teacherName.trim(),
+      teacherEmail: state.teacherEmail.trim(),
+      teacherTimezone: state.teacherTimezone,
+      month: m.month,
+      year: m.year,
+      slots: slots
+    };
+    console.log("[TA DEBUG] submit payload:", payload);
+    const submitRes=await apiPost("submitTeacherAvailability",payload);
+    console.log("[TA DEBUG] backend submit result:", submitRes);
+    show("ok","Availability submitted successfully.");
+    el("modal").classList.remove("open");
+  }
+  catch(e){show("error",String(e.message||e));}
+  finally{state.submitting=false; el("submit").disabled=false; el("submitState").textContent="";}
+}
+
+function render(){state.teacherName=el("teacherName").value; state.teacherEmail=el("teacherEmail").value; state.teacherTimezone=el("teacherTimezone").value; state.monthKey=el("month").value; applyTeacherMatch(); renderCampusGroups(); renderGrid(); renderSummary();
+  el("selStats").textContent=`${totalSlots()} slots selected in teacher timezone`;
+  show("multiCampusNotice", state.selectedCampusCodes.size>1 ? "The same availability will be converted separately for each selected campus." : "");
+  el("review").disabled=!(state.teacherName.trim()&&state.teacherEmail.trim()&&state.teacherTimezone&&totalSlots()>0&&state.selectedCampusCodes.size>0);
+}
+
+function init(){const browserTz=Intl.DateTimeFormat().resolvedOptions().timeZone||"America/Toronto"; el("teacherTimezone").innerHTML=TZ_OPTIONS.map(t=>`<option value="${t}">${t}</option>`).join(""); el("teacherTimezone").value=browserTz; state.teacherTimezone=browserTz;
+  const months=monthOptions(6); el("month").innerHTML=months.map(m=>`<option value="${m.key}">${m.label}</option>`).join(""); state.monthKey=months[0].key;
+  ["teacherName","teacherEmail","teacherTimezone","month","campusSearch"].forEach(id=>el(id).addEventListener("input",()=>{if(id==="campusSearch") state.search=el("campusSearch").value; if(id==="teacherEmail") state.emailTouched=true; if(id==="month") scheduleConflictRefresh(); render();}));
+  el("review").onclick=()=>{renderReview(); el("modal").classList.add("open");}; el("close").onclick=()=>el("modal").classList.remove("open"); el("modal").onclick=e=>{if(e.target===el("modal")) el("modal").classList.remove("open");}; el("submit").onclick=submitAvailability;
+  if(unresolvedApi) show("notice","Scheduler is not connected yet. Please add the Apps Script Web App URL.");
+  initTeachers(); initCampuses();
+}
+try{init()}catch(e){show("error","Failed to initialize scheduler: "+String(e.message||e)); console.error(e);}
+</script>
+</body>
+</html>
+
+
+
