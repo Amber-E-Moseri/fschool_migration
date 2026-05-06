@@ -1,2 +1,4 @@
 supabase.exe
 supabase/.temp/
+.claude/
+.vscode/
