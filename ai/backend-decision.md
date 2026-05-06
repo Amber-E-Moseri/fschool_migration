@@ -43,14 +43,22 @@ Status: Approved
 - Audit trail lives in `audit_logs`.
 - If values conflict, Supabase tables win.
 
+## Frontend Routing Canonical Path
+- Canonical app root is `/foundation`.
+- Canonical admin/staff pages live in `/foundation/staff/`.
+- Root-level `/staff/` is deprecated and must not be used for new links, redirects, or deploy routes.
+
 ## Phased Retirement Checklist
-1. Replace Apps Script reads with Supabase queries/Edge Functions.
-2. Replace Apps Script writes with Supabase writes (idempotent/upsert where needed).
-3. Verify parity for each workflow with manual regression checklist.
-4. Remove frontend Apps Script URL/meta/config usage.
-5. Remove Apps Script helper branches from shared JS (`api-client.js`).
-6. Disable Apps Script endpoints in production traffic path.
-7. Archive Apps Script project as read-only historical artifact.
+1. ✅ Replace Apps Script reads with Supabase queries/Edge Functions.
+2. ✅ Replace Apps Script writes with Supabase writes (idempotent/upsert where needed).
+3. ✅ Verify parity for each workflow with manual regression checklist.
+4. ✅ Remove frontend Apps Script URL/meta/config usage.
+   - Last reference was `window.TA_CONFIG.endpointBaseUrl` in `foundation/ui/teacher-availability/index.html`.
+   - Removed 2026-05-06. Config now uses `mode: "supabase"`.
+5. ✅ Remove Apps Script helper branches from shared JS (`api-client.js`).
+   - `api-client.js` was already Supabase-only; no dual-mode branches existed at final review.
+6. ⬜ Disable Apps Script endpoints in production traffic path (GCP console — manual step).
+7. ⬜ Archive Apps Script project as read-only historical artifact (GCP console — manual step).
 
 ## Exit Criteria for Full Retirement
 - No portal page calls Apps Script endpoints.

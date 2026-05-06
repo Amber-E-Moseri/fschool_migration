@@ -32,10 +32,10 @@ supabase_foundation/
 | Module | Location | Status |
 |---|---|---|
 | Registration | `apps-script/`, `registration/` | Working (Apps Script) |
-| Batch management | `staff/batch-management.html`, `sql/schema.sql` | In progress |
+| Batch management | `foundation/staff/batch-management.html`, `sql/schema.sql` | In progress |
 | Teacher availability | `apps-script/55_TEACHER_AVAILABILITY.js`, `ui/teacher-availability/` | In progress |
-| Attendance | `apps-script/40–43, 60_*.js`, `staff/TeacherAttendancePortal.html` | Working (Apps Script) |
-| Admin portal | `staff/admin-portal.html` + supporting pages | Working (static) |
+| Attendance | `apps-script/40–43, 60_*.js`, `foundation/staff/TeacherAttendancePortal.html` | Working (Apps Script) |
+| Admin portal | `foundation/staff/admin-portal.html` + supporting pages | Working (static) |
 | Email queue | `edge-functions/mailchimp-sync/`, `email_queue` table | Partial |
 | Moodle mapping | `sql/schema.sql`, `edge-functions/moodle-sync/` | Stubbed |
 | Audit logs | `audit_logs` + `failed_syncs` tables | Schema defined |
@@ -51,6 +51,17 @@ supabase_foundation/
 ---
 
 ## Getting started
+### App root (canonical)
+- Serve `foundation/` as the web app root.
+- Canonical staff pages live under `/foundation/staff/`.
+- Root-level /staff/ is deprecated and removed.
+
+### Static local server
+```bash
+cd foundation
+npx serve .
+```
+
 
 ### Apps Script
 ```bash
@@ -127,3 +138,4 @@ git commit -m "docs: update known bugs"
 - [`CONSTRAINTS.md`](foundation/docs/CONSTRAINTS.md)
 - [`KNOWNBUGS.md`](foundation/docs/KNOWNBUGS.md)
 - [`NEXT_STEPS.md`](foundation/docs/NEXT_STEPS.md)
+
