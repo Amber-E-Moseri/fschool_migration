@@ -1,0 +1,14 @@
+# Supabase Edge Function configuration for email-sender.
+#
+# Schedule: daily at 7:00 AM America/Toronto (EST = UTC-5).
+# UTC equivalent: 12:00 UTC (winter/EST).
+# During EDT (UTC-4, Mar–Nov) this fires at 11:00 AM local — adjust
+# the cron expression seasonally if strict local-time alignment is required.
+#
+# Requires env vars: RESEND_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# Set these via: supabase secrets set RESEND_API_KEY=re_...
+
+[functions.email-sender]
+enabled     = true
+verify_jwt  = false
+schedule    = "0 12 * * *"
