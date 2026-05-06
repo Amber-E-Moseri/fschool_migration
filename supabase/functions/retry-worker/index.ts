@@ -26,27 +26,50 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: string) {
-  const profile = await serviceDb
-    .from("profiles")
-    .select("role,is_active")
-    .eq("user_id", userId)
-    .maybeSingle();
+async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: string, email?: string) {
+  // Legacy/current admin table first
+  if (true) {
+    const legacy = await serviceDb
+      .from("admin_users")
+      .select("role,status,active")
+      .or(`auth_user_id.eq.${userId}${email ? `,email.eq.${email}` : ""}`)
+      .maybeSingle();
 
-  const role = String(profile.data?.role || "").toLowerCase();
-  const active = profile.data?.is_active !== false;
-  if (active && ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role)) {
-    return true;
+    const legacyRole = String(legacy.data?.role || "").toLowerCase();
+    const active =
+      legacy.data?.active !== false &&
+      legacy.data?.status !== "suspended";
+
+    if (
+      active &&
+      ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(legacyRole)
+    ) {
+      return true;
+    }
   }
 
-  const legacy = await serviceDb
-    .from("admin_users")
-    .select("role")
-    .eq("auth_user_id", userId)
-    .maybeSingle();
+  // Optional newer profiles table fallback
+  try {
+    const profile = await serviceDb
+      .from("profiles")
+      .select("role,is_active")
+      .eq("user_id", userId)
+      .maybeSingle();
 
-  const legacyRole = String(legacy.data?.role || "").toLowerCase();
-  return ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(legacyRole);
+    const role = String(profile.data?.role || "").toLowerCase();
+    const active = profile.data?.is_active !== false;
+
+    if (
+      active &&
+      ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role)
+    ) {
+      return true;
+    }
+  } catch (_) {
+    // profiles table missing -> ignore
+  }
+
+  return false;
 }
 
 async function logAudit(
@@ -182,7 +205,11 @@ Deno.serve(async (req) => {
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
     if (userErr || !userData?.user) return json({ ok: false, error: "Invalid session" }, 401);
-    const allowed = await isAdmin(serviceDb, userData.user.id);
+const allowed = await isAdmin(
+  serviceDb,
+  userData.user.id,
+  userData.user.email,
+);
     if (!allowed) return json({ ok: false, error: "Admin access required" }, 403);
 
     const body = (await req.json().catch(() => ({}))) as RetryRequest;
