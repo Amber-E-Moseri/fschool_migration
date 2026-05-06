@@ -163,7 +163,9 @@
     z-index: 50;
     max-height: 220px;
     overflow-y: auto;
-    padding: 6px;`n    box-shadow: 0 4px 12px rgba(30,21,53,.08);`n  }
+    padding: 6px;
+    box-shadow: 0 4px 12px rgba(30,21,53,.08);
+  }
   .drop-item {
     padding: 9px 12px;
     border-radius: 8px;
@@ -443,22 +445,11 @@
   }
 </style>
   <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
 </head>
 <body>
-
-<nav class="nav">
-  <div class="nav-brand">
-    <div class="nav-mark">RS</div>
-    Rock Solid Foundation School
-  </div>
-  <div class="nav-links">
-    <a class="nav-link" href="TeacherAttendancePortal.html">✅ <span>Attendance</span></a>
-    <a class="nav-link active" href="#">📊 <span>Progress</span></a>
-    <a class="nav-link" href="teacher-schedule.html">📅 <span>Schedule</span></a>
-  </div>
-</nav>
-
-<main class="wrap">
+<main class="wrap fs-page">
 
   <!-- SETUP -->
   <div class="card">
@@ -536,15 +527,7 @@
 
   function esc(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-  async function apiGet(action, params={}) {
-    const u = new URL(API_URL);
-    u.searchParams.set('action', action);
-    Object.entries(params).forEach(([k,v]) => u.searchParams.set(k,v));
-    const r = await fetch(u);
-    const j = await r.json();
-    if (!r.ok || j.ok===false) throw new Error(j.error||'Request failed');
-    return j;
-  }
+  async function apiGet(action, params={}) { return window.FSApi.get(action, params); }
 
   // ── TEACHER SEARCH ──
   let tmr = null;
@@ -721,7 +704,13 @@
     a.click();
   }
 </script>
-  <script src="../ui/premium-shell.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api-client.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/modal.js"></script>
+  <script src="../js/teacher-shell.js"></script>
+  <script>window.FSTeacherShell.mount({ active: 'progress' });</script>
 </body>
 </html>
 

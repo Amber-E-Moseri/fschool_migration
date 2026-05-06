@@ -93,49 +93,6 @@
     .rs-nav__inner { padding: 10px 12px; }
     .rs-nav__link { padding: 8px 10px; }
   }
-  .topbar {
-    position: sticky;
-    top: 52px;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px 24px;
-    background: #fff;
-    border-bottom: 1px solid var(--border);
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: 800;
-    font-size: .96rem;
-    color: var(--ink);
-    min-width: 0;
-  }
-  .brand-mark {
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
-    background: var(--navy);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    box-shadow: none;
-    flex-shrink: 0;
-  }
-  .topbar-badge {
-    padding: 8px 12px;
-    border-radius: 999px;
-    background: #fff;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-size: .78rem;
-    font-weight: 700;
-    white-space: nowrap;
-  }
   .wrap {
     max-width: 680px;
     margin: 0 auto;
@@ -506,11 +463,9 @@
   }
   @media (max-width: 760px) {
     .wrap { padding: 14px 12px calc(120px + env(safe-area-inset-bottom)); }
-    .topbar { padding: 14px 16px; }
     .card { padding: 18px; border-radius: 10px; }
     .stats, .action-grid { grid-template-columns: 1fr; }
     .hero-title { font-size: 2rem; }
-    .topbar-badge { display: none; }
     .btn { width: 100%; justify-content: center; }
     .spacer { display: none; }
     .toolbar .btn { width: auto; }
@@ -519,25 +474,11 @@
   }
 </style>
   <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
 </head>
 <body>
-  <nav class="rs-nav" aria-label="Teacher Portal Navigation">
-    <div class="rs-nav__inner">
-      <div class="rs-nav__brand">RS</div>
-      <a class="rs-nav__link is-active" href="TeacherAttendancePortal.html"><span class="rs-nav__icon">✅</span><span class="rs-nav__label">Attendance</span></a>
-      <a class="rs-nav__link" href="StudentProgressView.html"><span class="rs-nav__icon">📊</span><span class="rs-nav__label">Student Progress</span></a>
-      <a class="rs-nav__link" href="teacher-schedule.html"><span class="rs-nav__icon">📅</span><span class="rs-nav__label">My Schedule</span></a>
-    </div>
-  </nav>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-mark">RS</div>
-      <div>Rock Solid Foundation School</div>
-    </div>
-    <div class="topbar-badge" id="ctx-badge">Teacher Attendance Portal</div>
-  </header>
-
-  <main class="wrap">
+  <main class="wrap fs-page">
     <section class="hero">
       <h1 class="hero-title">Teacher Attendance Portal</h1>
     </section>
@@ -632,33 +573,21 @@
 
     function esc(s){ return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-    async function apiGet(action, params = {}) {
-      const u = new URL(API_URL);
-      u.searchParams.set('action', action);
-      Object.entries(params).forEach(([k,v]) => u.searchParams.set(k, v));
-      const r = await fetch(u);
-      const j = await r.json();
-      if (!r.ok || j.ok === false) throw new Error(j.error || 'Request failed');
-      return j;
-    }
+    async function apiGet(action, params = {}) { return window.FSApi.get(action, params); }
 
-    async function apiPost(action, body) {
-      const u = new URL(API_URL);
-      u.searchParams.set('action', action);
-      const r = await fetch(u, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
-      const text = await r.text();
-      let j;
-      try { j = JSON.parse(text); } catch(e) { throw new Error('Invalid JSON response from Apps Script.'); }
-      if (!r.ok || j.ok === false) throw new Error(j.error || 'Request failed');
-      return j;
-    }
+    async function apiPost(action, body) { return window.FSApi.post(action, body); }
 
     function stepFor(n){ return ({1:1,2:2,3:3,4:4,5:5,6:5,7:3,8:5})[n] || 1; }
     function updateStepper(n){ const active = stepFor(n); [1,2,3,4,5].forEach(i => { const el = document.getElementById('step-' + i); if(!el) return; el.className = 'step' + (i < active ? ' done' : i === active ? ' active' : ''); }); }
     function show(n){ [1,2,3,4,5,6,7,8].forEach(x => document.getElementById('s'+x)?.classList.add('hidden')); document.getElementById('s'+n)?.classList.remove('hidden'); updateStepper(n); window.scrollTo({top:0, behavior:'smooth'}); }
     function selectedClassLabel(){ return state.classOption ? state.classOption.classOptionId : ''; }
     function selectedSessionLabel(){ return (state.sessions || []).join(' + '); }
-    function updateBadge(){ const parts=[]; if(state.teacher) parts.push(state.teacher.fullName); const cls = selectedClassLabel(); if(cls) parts.push(cls); document.getElementById('ctx-badge').textContent = parts.join(' · ') || 'Teacher Attendance Portal'; }
+    function updateBadge(){
+      const el = document.getElementById('ctx-badge');
+      if(!el) return;
+      const parts=[]; if(state.teacher) parts.push(state.teacher.fullName); const cls = selectedClassLabel(); if(cls) parts.push(cls);
+      el.textContent = parts.join(' · ') || 'Teacher Attendance Portal';
+    }
 
     let tmr = null;
     function onTeacherInput(){ clearTimeout(tmr); const q = document.getElementById('teacherQuery').value.trim(); if(q.length < 2){ document.getElementById('teacherList').innerHTML = ''; return; } tmr = setTimeout(() => lookupTeacherForAttendance(q), 250); }
@@ -835,7 +764,13 @@
 
     show(1);
   </script>
-  <script src="../ui/premium-shell.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api-client.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/modal.js"></script>
+  <script src="../js/teacher-shell.js"></script>
+  <script>window.FSTeacherShell.mount({ active: 'attendance' });</script>
 </body>
 </html>
 

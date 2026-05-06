@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="teacher-availability-api-url" content="https://script.google.com/macros/s/AKfycbwQQhGZvLcX689zhC6kL9RgbubHGbh8FFMCoO2zSXBrNn21WIUGmPP_xPXa06QOHb00nA/exec" />
+  <meta name="supabase-url" content="https://xelpsttqhrcqmttmjory.supabase.co" />
+  <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlbHBzdHRxaHJjcW10dG1qb3J5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4ODcxMTMsImV4cCI6MjA5MzQ2MzExM30.7a5yGvkaxxUBMOZl-_nZjjDCVYYvf4FrmwwhrzYd9zQ" />
   <title>Rock Solid - Teacher Availability</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
@@ -71,26 +72,11 @@
     @media(max-width:980px){.grid{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
   </style>
   <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
 </head>
 <body>
-<nav class="rs-nav" aria-label="Teacher Portal Navigation">
-  <div class="rs-nav__inner">
-    <div class="rs-nav__brand">RS</div>
-    <a class="rs-nav__link" href="TeacherAttendancePortal.html">
-      <span class="rs-nav__icon">&#x2705;</span>
-      <span class="rs-nav__label">Attendance</span>
-    </a>
-    <a class="rs-nav__link" href="StudentProgressView.html">
-      <span class="rs-nav__icon">&#x1F4CA;</span>
-      <span class="rs-nav__label">Student Progress</span>
-    </a>
-    <a class="rs-nav__link is-active" href="teacher-schedule.html">
-      <span class="rs-nav__icon">&#x1F4C5;</span>
-      <span class="rs-nav__label">My Schedule</span>
-    </a>
-  </div>
-</nav>
-<main class="wrap">
+<main class="wrap fs-page">
   <div class="pill" style="background:var(--lilacSoft);border-color:transparent;color:var(--navy);font-weight:700;margin-bottom:6px">Rock Solid Scheduler</div>
   <h1 class="title">Teacher Availability</h1>
   <div class="sub mb">Select times in your timezone. We automatically convert them for each campus timezone.</div>
@@ -166,9 +152,9 @@ const FALLBACK_CAMPUSES=[
 const TZ_OPTIONS=["America/Toronto","America/Edmonton","America/Vancouver","America/Regina","America/Winnipeg","America/Halifax","America/St_Johns","UTC"];
 const state={campuses:[],teachers:[],campusSource:"live",selectedCampusCodes:new Set(),activeCampusCode:"",slotSet:new Set(),search:"",
 teacherName:"",teacherEmail:"",teacherTimezone:"",monthKey:"",submitting:false,occupiedByCampus:{},emailTouched:false,campusDebug:null,selectedTeacher:null,conflictCache:{},conflictDebounceTimer:null,conflictLoading:false};
-const apiUrl=(document.querySelector('meta[name="teacher-availability-api-url"]')?.content||"").trim();
-const apiToken=(document.querySelector('meta[name="teacher-availability-api-token"]')?.content||"").trim();
-const unresolvedApi=!apiUrl||apiUrl==="__TEACHER_AVAILABILITY_API_URL__";
+const SUPABASE_URL = (document.querySelector('meta[name="supabase-url"]')?.content || window.FS_SUPABASE_URL || "").trim();
+const SUPABASE_ANON_KEY = (document.querySelector('meta[name="supabase-anon-key"]')?.content || window.FS_SUPABASE_ANON_KEY || "").trim();
+const backendMode = "supabase";
 const el=id=>document.getElementById(id); const norm=s=>String(s||"").trim().replace(/\s+/g," ").toLowerCase();
 const show=(id,msg)=>{const n=el(id);n.style.display=msg?"block":"none";n.textContent=msg||""};
 const slotKey=(d,t)=>`${d}__${t}`; const splitKey=k=>{const [day,time]=String(k).split("__");return{day,time}};
@@ -178,13 +164,146 @@ function campusBy(code){return state.campuses.find(c=>c.code===code)}
 function totalSlots(){return state.slotSet.size}
 function dayIdx(day){return DAYS.indexOf(day)}
 function parseTime12h(v){const m=String(v).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i); if(!m)return null; let h=Number(m[1]); const mi=Number(m[2]); const ap=m[3].toUpperCase(); if(ap==="PM"&&h<12)h+=12; if(ap==="AM"&&h===12)h=0; return {h,mi};}
+function to24h(v){ const t = parseTime12h(v); if(!t) return null; return `${String(t.h).padStart(2,"0")}:${String(t.mi).padStart(2,"0")}:00`; }
 function weekdayDateInMonth(year,monthIndex,weekdayName){const first=new Date(year,monthIndex-1,1); const firstIdx=(first.getDay()+6)%7; const target=dayIdx(weekdayName); const delta=(target-firstIdx+7)%7; return 1+delta;}
 function getTzOffsetMs(instant,timeZone){const dtf=new Intl.DateTimeFormat("en-US",{timeZone,hour12:false,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}); const p=Object.fromEntries(dtf.formatToParts(instant).map(x=>[x.type,x.value])); const asUtc=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute),Number(p.second)); return asUtc-instant.getTime();}
 function wallClockToInstant(year,monthIndex,dayOfMonth,hour,minute,timeZone){const naive=Date.UTC(year,monthIndex-1,dayOfMonth,hour,minute,0); const off1=getTzOffsetMs(new Date(naive),timeZone); const adj=naive-off1; const off2=getTzOffsetMs(new Date(adj),timeZone); return new Date(off1===off2?adj:adj-off2+off1);}
 function convertTeacherSlotToCampus(slot,teacherTz,campusTz){const m=selectedMonth(); const t=parseTime12h(slot.time); if(!t) return {campusDay:slot.day,campusTime:slot.time}; const dom=weekdayDateInMonth(m.year,m.monthIndex,slot.day); const instant=wallClockToInstant(m.year,m.monthIndex,dom,t.h,t.mi,teacherTz); const parts=new Intl.DateTimeFormat("en-US",{timeZone:campusTz,weekday:"long",hour:"numeric",minute:"2-digit",hour12:true}).formatToParts(instant); const campusDay=(parts.find(p=>p.type==="weekday")||{}).value||slot.day; const hr=(parts.find(p=>p.type==="hour")||{}).value||""; const mi=(parts.find(p=>p.type==="minute")||{}).value||"00"; const dp=((parts.find(p=>p.type==="dayPeriod")||{}).value||"").toUpperCase(); return {campusDay,campusTime:`${hr}:${mi} ${dp}`};}
 
-async function apiGet(action){if(unresolvedApi) throw new Error("Scheduler is not connected yet. Please add the Apps Script Web App URL."); const u=new URL(apiUrl); u.searchParams.set("action",action); if(apiToken) u.searchParams.set("token",apiToken); const res=await fetch(u.toString()); const json=await res.json(); if(!res.ok||!json||json.ok===false) throw new Error((json&&json.error)||`${action} failed (${res.status})`); return json;}
-async function apiPost(action, body){if(unresolvedApi) throw new Error("Scheduler is not connected yet. Please add the Apps Script Web App URL."); const u=new URL(apiUrl); u.searchParams.set("action",action); if(apiToken) u.searchParams.set("token",apiToken); const reqBody=Object.assign({}, body||{}); if(apiToken) reqBody.token=apiToken; const res=await fetch(u.toString(),{method:"POST",body:JSON.stringify(reqBody)}); const json=await res.json(); if(!res.ok||!json||json.ok===false) throw new Error((json&&json.error)||`${action} failed (${res.status})`); return json;}
+function reportApiError(action, err){
+  const msg = `Action: ${action}\nMode: ${backendMode}\nError: ${String(err && err.message ? err.message : err)}`;
+  show("error", msg);
+}
+async function apiGet(action, params){
+  try {
+    if(action === "getTeachers"){
+      const data = await window.FSApi.supabaseSelect("teachers", (q) =>
+        q.select("teacher_id,full_name,email,active,deleted_at")
+         .eq("active", true)
+         .is("deleted_at", null)
+         .order("full_name")
+      );
+      return {
+        ok: true,
+        data: (data || []).map((r) => ({
+          teacherName: r.full_name || "",
+          teacherEmail: r.email || "",
+          teacherTimezone: "America/Toronto"
+        }))
+      };
+    }
+
+    if(action === "getCampuses"){
+      const data = await window.FSApi.supabaseSelect("fellowship_map", (q) =>
+        q.select("fellowship_code,campus_name,group_id,subgroup_id,timezone,active")
+         .eq("active", true)
+         .order("campus_name")
+      );
+      return {
+        ok: true,
+        data: (data || []).map((r) => ({
+          code: r.fellowship_code,
+          campusName: r.campus_name,
+          groupID: r.group_id,
+          subgroupID: r.subgroup_id,
+          timezone: r.timezone || "America/Toronto"
+        }))
+      };
+    }
+
+    if(action === "debugCampuses"){
+      return { ok: true, data: { rowsRead: 0, rowsIncluded: 0, rowsSkipped: 0, skippedReasons: {}, source: "supabase" } };
+    }
+
+    if(action === "getSchedulesForCampuses"){
+      const campusCodes = String(params?.campusCodes || "").split(",").map((s)=>s.trim().toUpperCase()).filter(Boolean);
+      const rows = await window.FSApi.supabaseSelect("class_options", (q) =>
+        q.select("fellowship_codes,day,class_time,teacher_name,active,enrollment_open,deleted_at")
+         .eq("active", true)
+         .eq("enrollment_open", true)
+         .is("deleted_at", null)
+      );
+      const byCampus = {};
+      campusCodes.forEach((c) => { byCampus[c] = []; });
+      (rows || []).forEach((r) => {
+        const raw = String(r.fellowship_codes || "{}").replace(/^\{|\}$/g, "");
+        const codes = raw.split(",").map((x)=>x.trim().toUpperCase()).filter(Boolean);
+        if(!r.day || !r.class_time) return;
+        const hhmm = String(r.class_time).slice(0,5);
+        const [hh, mm] = hhmm.split(":").map((x)=>Number(x));
+        const ap = hh >= 12 ? "PM" : "AM";
+        const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+        const time12 = `${h12}:${String(mm).padStart(2,"0")} ${ap}`;
+        campusCodes.forEach((campus) => {
+          if(codes.includes(campus)){
+            byCampus[campus].push({ classDay: r.day, classTime: time12, teacherName: r.teacher_name || "" });
+          }
+        });
+      });
+      return { ok: true, data: byCampus };
+    }
+
+    throw new Error(`Unsupported GET action in Supabase mode: ${action}`);
+  } catch (e) {
+    reportApiError(action, e);
+    throw e;
+  }
+}
+async function apiPost(action, body){
+  try {
+    if(action !== "submitTeacherAvailability"){
+      throw new Error(`Unsupported POST action in Supabase mode: ${action}`);
+    }
+    const teacherName = String(body?.teacherName || "").trim();
+    const teacherEmail = String(body?.teacherEmail || "").trim();
+    const teacherTimezone = String(body?.teacherTimezone || "").trim() || "America/Toronto";
+    const slots = Array.isArray(body?.slots) ? body.slots : [];
+    if(!teacherName || !teacherEmail || !slots.length){
+      throw new Error("Missing teacher name/email or no slots selected.");
+    }
+    const teacherRows = await window.FSApi.supabaseSelect("teachers", (q) =>
+      q.select("teacher_id,email,full_name,active,deleted_at")
+       .eq("active", true)
+       .is("deleted_at", null)
+       .eq("email", teacherEmail)
+       .limit(1)
+    );
+    const teacherId = teacherRows?.[0]?.teacher_id;
+    if(!teacherId){
+      throw new Error(`No active teacher found for email ${teacherEmail}.`);
+    }
+    const batchRows = await window.FSApi.supabaseSelect("batches", (q) =>
+      q.select("batch_id,active,registration_open,start_date")
+       .or("active.eq.true,registration_open.eq.true")
+       .order("start_date", { ascending: false })
+       .limit(1)
+    );
+    const batchId = batchRows?.[0]?.batch_id || null;
+    if(!batchId){
+      throw new Error("No active/open batch found for availability submission.");
+    }
+
+    const payload = slots.map((s) => ({
+      teacher_id: teacherId,
+      batch_id: batchId,
+      day: s.teacherDay,
+      time_slot: to24h(s.teacherTime),
+      status: "Tentative",
+      notes: `Campus: ${s.campusCode || "—"} · ${body?.month || ""} ${body?.year || ""}`.trim(),
+      created_by: teacherEmail,
+      updated_by: teacherEmail
+    })).filter((r) => Boolean(r.time_slot));
+
+    if(!payload.length){
+      throw new Error("No valid slots were generated for insert.");
+    }
+    await window.FSApi.supabaseInsert("teacher_availability", payload);
+    return { ok: true, inserted: payload.length };
+  } catch (e) {
+    reportApiError(action, e);
+    throw e;
+  }
+}
 async function initTeachers(){
   try{
     const json=await apiGet("getTeachers");
@@ -237,7 +356,6 @@ function conflictCacheKey(){
 }
 
 async function refreshConflicts(){
-  if(unresolvedApi){ state.occupiedByCampus = {}; return; }
   const key=conflictCacheKey();
   if(state.conflictCache[key]){
     state.occupiedByCampus=state.conflictCache[key];
@@ -248,15 +366,11 @@ async function refreshConflicts(){
   const out = {};
   selected.forEach(c=>{out[c]=new Set();});
   if(!selected.length){state.occupiedByCampus=out;return;}
-  const u=new URL(apiUrl);
-  u.searchParams.set("action","getSchedulesForCampuses");
-  u.searchParams.set("campusCodes",selected.join(","));
-  u.searchParams.set("month",m.month);
-  u.searchParams.set("year",String(m.year));
-  if(apiToken) u.searchParams.set("token", apiToken);
-  const res=await fetch(u.toString());
-  const json=await res.json();
-  if(!res.ok||!json||json.ok===false) throw new Error((json&&json.error)||`getSchedulesForCampuses failed (${res.status})`);
+  const json = await apiGet("getSchedulesForCampuses", {
+    campusCodes: selected.join(","),
+    month: m.month,
+    year: String(m.year)
+  });
   const byCampus=(json&&json.data)||{};
   selected.forEach(code=>{
     const rows=Array.isArray(byCampus[code])?byCampus[code]:[];
@@ -359,7 +473,6 @@ async function submitAvailability(){show("error",""); show("ok",""); const recor
   if(!state.teacherName.trim()||!state.teacherEmail.trim()) return show("error","Please enter teacher name and email.");
   if(!state.teacherTimezone) return show("error","Please select teacher timezone.");
   if(totalSlots()===0) return show("error","Select at least one slot before submitting.");
-  if(unresolvedApi) return show("error","Scheduler is not connected yet. Please add the Apps Script Web App URL.");
   state.submitting=true; el("submit").disabled=true; el("submitState").textContent="Submitting...";
   try{
     const m = selectedMonth();
@@ -398,12 +511,36 @@ function init(){const browserTz=Intl.DateTimeFormat().resolvedOptions().timeZone
   const months=monthOptions(6); el("month").innerHTML=months.map(m=>`<option value="${m.key}">${m.label}</option>`).join(""); state.monthKey=months[0].key;
   ["teacherName","teacherEmail","teacherTimezone","month","campusSearch"].forEach(id=>el(id).addEventListener("input",()=>{if(id==="campusSearch") state.search=el("campusSearch").value; if(id==="teacherEmail") state.emailTouched=true; if(id==="month") scheduleConflictRefresh(); render();}));
   el("review").onclick=()=>{renderReview(); el("modal").classList.add("open");}; el("close").onclick=()=>el("modal").classList.remove("open"); el("modal").onclick=e=>{if(e.target===el("modal")) el("modal").classList.remove("open");}; el("submit").onclick=submitAvailability;
-  if(unresolvedApi) show("notice","Scheduler is not connected yet. Please add the Apps Script Web App URL.");
   initTeachers(); initCampuses();
 }
-try{init()}catch(e){show("error","Failed to initialize scheduler: "+String(e.message||e)); console.error(e);}
+window.addEventListener("load", () => {
+  try {
+    if(!SUPABASE_URL || !SUPABASE_ANON_KEY){
+      throw new Error("Supabase URL/anon key is missing.");
+    }
+    if(!window.supabase || typeof window.supabase.createClient !== "function"){
+      throw new Error("Supabase JS client was not loaded.");
+    }
+    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if(!window.FSApi){
+      throw new Error("Shared API client was not loaded.");
+    }
+    window.FSApi.setConfig({ backendMode: "supabase" });
+    init();
+  } catch(e){
+    show("error","Failed to initialize scheduler.\nMode: "+backendMode+"\nError: "+String(e.message||e));
+    console.error(e);
+  }
+});
 </script>
-  <script src="../ui/premium-shell.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/api-client.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/modal.js"></script>
+  <script src="../js/teacher-shell.js"></script>
+  <script>window.FSTeacherShell.mount({ active: 'schedule' });</script>
 </body>
 </html>
 

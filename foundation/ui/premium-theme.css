@@ -42,12 +42,12 @@ html, body { min-height: 100%; }
 body {
   background: var(--bg) !important;
   color: var(--text) !important;
-  font-family: "Inter", "DM Sans", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-family: "Manrope", "Inter", "DM Sans", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
   letter-spacing: 0;
 }
 
 h1,h2,h3,h4,.font-heading,.brand h1,.hdr-title {
-  font-family: "DM Sans", "Inter", "League Spartan", sans-serif !important;
+  font-family: "Manrope", "DM Sans", "Inter", "League Spartan", sans-serif !important;
   color: var(--text) !important;
 }
 
