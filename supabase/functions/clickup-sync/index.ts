@@ -183,6 +183,47 @@ async function resolveAssignee(
   return fallbackAssigneeId || "";
 }
 
+type Watcher = {
+  clickup_user_id: string;
+  watcher_name: string;
+};
+
+async function resolveWatchers(
+  db: ReturnType<typeof createClient>,
+  groupId: string,
+  subgroupId: string,
+) {
+  if (!groupId) return [] as Watcher[];
+
+  if (subgroupId) {
+    const { data: subgroupRows } = await db
+      .from("clickup_admin_watchers")
+      .select("clickup_user_id,watcher_name")
+      .eq("active", true)
+      .eq("group_id", groupId)
+      .eq("subgroup_id", subgroupId)
+      .order("updated_at", { ascending: false });
+    if ((subgroupRows || []).length > 0) {
+      return (subgroupRows || []).map((w) => ({
+        clickup_user_id: String(w.clickup_user_id || "").trim(),
+        watcher_name: String(w.watcher_name || "").trim(),
+      })).filter((w) => w.clickup_user_id);
+    }
+  }
+
+  const { data: groupRows } = await db
+    .from("clickup_admin_watchers")
+    .select("clickup_user_id,watcher_name")
+    .eq("active", true)
+    .eq("group_id", groupId)
+    .is("subgroup_id", null)
+    .order("updated_at", { ascending: false });
+  return (groupRows || []).map((w) => ({
+    clickup_user_id: String(w.clickup_user_id || "").trim(),
+    watcher_name: String(w.watcher_name || "").trim(),
+  })).filter((w) => w.clickup_user_id);
+}
+
 function buildDedupeKey(type: RequestType, payload: MissedClassPayload | EscalationPayload) {
   if (type === "missed_class") {
     const p = payload as MissedClassPayload;
@@ -290,6 +331,26 @@ async function createClickUpTaskWithBackoff(
   throw new Error(lastError || "ClickUp task create failed");
 }
 
+async function addWatcherComment(
+  apiKey: string,
+  taskId: string,
+  watcher: Watcher,
+) {
+  const text = `Watcher: ${watcher.watcher_name || "Unspecified"} (ClickUp ID ${watcher.clickup_user_id})`;
+  const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/comment`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: apiKey,
+    },
+    body: JSON.stringify({ comment_text: text }),
+  });
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(`Watcher comment failed (${res.status}): ${message}`);
+  }
+}
+
 async function updateSourceTaskId(
   db: ReturnType<typeof createClient>,
   type: RequestType,
@@ -391,6 +452,7 @@ Deno.serve(async (req) => {
     const groupId = normalizeText((payload as MissedClassPayload).group_id || (payload as EscalationPayload).group_id);
     const subgroupId = normalizeText((payload as MissedClassPayload).subgroup_id || (payload as EscalationPayload).subgroup_id);
     const assigneeId = await resolveAssignee(db, groupId, subgroupId, CLICKUP_DEFAULT_ASSIGNEE_ID);
+    const watchers = await resolveWatchers(db, groupId, subgroupId);
 
     const taskBody = buildTask(type, payload, assigneeId);
     let created: Record<string, unknown> = {};
@@ -435,6 +497,29 @@ Deno.serve(async (req) => {
       assignee_id: assigneeId || null,
       due_date: toIsoDate(new Date(Number(taskBody.due_date || Date.now()))),
     });
+
+    if (clickupTaskId && !existing.data?.clickup_task_id && existing.data?.status !== "CREATED") {
+      for (const watcher of watchers) {
+        try {
+          await addWatcherComment(CLICKUP_API_KEY, clickupTaskId, watcher);
+          await logAudit(db, "CLICKUP_WATCHER_ADDED", "SUCCESS", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
+            dedupe_key: dedupeKey,
+            clickup_task_id: clickupTaskId,
+            watcher_clickup_user_id: watcher.clickup_user_id,
+            watcher_name: watcher.watcher_name || null,
+          });
+        } catch (watcherErr) {
+          const watcherMsg = watcherErr instanceof Error ? watcherErr.message : String(watcherErr);
+          await logAudit(db, "CLICKUP_WATCHER_FAILED", "FAILED", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
+            dedupe_key: dedupeKey,
+            clickup_task_id: clickupTaskId,
+            watcher_clickup_user_id: watcher.clickup_user_id,
+            watcher_name: watcher.watcher_name || null,
+            error: watcherMsg,
+          });
+        }
+      }
+    }
 
     return json({
       ok: true,
