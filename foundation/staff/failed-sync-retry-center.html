@@ -11,59 +11,95 @@
   <link rel="stylesheet" href="../ui/components.css" />
   <link rel="stylesheet" href="../ui/layout.css" />
   <link rel="stylesheet" href="../ui/admin-shell.css" />
-  <style>
-    body { font-family: "Manrope", system-ui, sans-serif; }
-    .hero-title { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.2rem); }
-    .hero-sub { margin-top: 6px; }
-    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .table-wrap { overflow: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 1080px; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: var(--surface-2); }
-    .chip { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid var(--border); }
-    .chip.bad { background: var(--danger-soft); color: #a33131; }
-    .chip.warn { background: #fff4db; color: #8a5600; }
-    .chip.info { background: var(--soft-lavender); color: var(--primary); }
-    .state { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); }
-    .actions { display: inline-flex; gap: 6px; }
-    .muted-cell { color: var(--muted); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  </style>
 </head>
 <body>
-  <main class="fs-page">
+  <main class="fs-page fs-wrap-xl ops-page">
     <section class="hero">
       <h1 class="hero-title">Failed Sync Retry Center</h1>
-      <p class="hero-sub">Retry failed syncs and queue processing safely without losing records.</p>
+      <p class="hero-sub">Operational view for failed jobs across queue, notifications, Moodle sync, and Mailchimp-linked failures.</p>
+    </section>
+
+    <section class="ops-summary-grid">
+      <article class="ops-kpi-card"><h3>Total Failed Jobs</h3><div id="kTotal" class="ops-kpi-value">0</div></article>
+      <article class="ops-kpi-card"><h3>Failed Emails</h3><div id="kEmails" class="ops-kpi-value">0</div></article>
+      <article class="ops-kpi-card"><h3>Failed Moodle Syncs</h3><div id="kMoodle" class="ops-kpi-value">0</div></article>
+      <article class="ops-kpi-card"><h3>Failed Mailchimp Syncs</h3><div id="kMailchimp" class="ops-kpi-value">0</div></article>
+      <article class="ops-kpi-card"><h3>Retries Attempted Today</h3><div id="kRetriesToday" class="ops-kpi-value">0</div></article>
     </section>
 
     <section class="card">
-      <div class="controls">
+      <div class="ops-filter-grid">
+        <div>
+          <label for="filterType">Type</label>
+          <select id="filterType">
+            <option value="all">All Types</option>
+            <option value="email">Email</option>
+            <option value="moodle">Moodle</option>
+            <option value="mailchimp">Mailchimp</option>
+            <option value="sync">Sync</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterStatus">Status</label>
+          <select id="filterStatus">
+            <option value="all">All Statuses</option>
+            <option value="failed">Failed</option>
+            <option value="error">Error</option>
+            <option value="pending">Pending</option>
+            <option value="retry">Retry</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterFrom">From Date</label>
+          <input id="filterFrom" type="date" />
+        </div>
+        <div>
+          <label for="filterTo">To Date</label>
+          <input id="filterTo" type="date" />
+        </div>
+        <div class="ops-search-col">
+          <label for="searchInput">Search</label>
+          <input id="searchInput" type="search" placeholder="Search email, student, status, error..." />
+        </div>
+      </div>
+
+      <div class="ops-actions-row">
         <button id="refreshBtn" class="btn primary">Refresh</button>
         <button id="retrySelectedBtn" class="btn">Retry Selected</button>
-        <button id="resolveSelectedBtn" class="btn">Mark Selected Resolved</button>
+        <button id="retryVisibleBtn" class="btn">Retry All Visible</button>
+        <button id="resolveSelectedBtn" class="btn">Mark Resolved</button>
         <span class="spacer"></span>
-        <span id="summary" class="muted">0 records</span>
+        <span id="summaryLine" class="muted">0 visible</span>
       </div>
     </section>
 
+    <section id="errorBox" class="err hidden"></section>
+    <section id="okBox" class="ok hidden"></section>
+    <section id="infoBox" class="warn hidden"></section>
+
     <section class="card">
-      <div id="state" class="state">Loading failed records...</div>
+      <div id="loadingState" class="state">Loading failed jobs...</div>
+      <div id="emptyState" class="state hidden">No failed jobs match current filters.</div>
+
       <div id="tableWrap" class="table-wrap hidden">
         <table>
           <thead>
             <tr>
-              <th><input id="selectAll" type="checkbox" aria-label="Select all" /></th>
-              <th>Source</th>
-              <th>Target</th>
+              <th><input id="selectAll" type="checkbox" aria-label="Select all visible" /></th>
+              <th>Type</th>
+              <th>Recipient / Student</th>
               <th>Status</th>
               <th>Error</th>
-              <th>Updated</th>
+              <th>Created</th>
+              <th>Last Attempted</th>
+              <th>Retry Count</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
+      <div id="mobileCards" class="ops-mobile-cards"></div>
     </section>
 
     <section class="card">
@@ -72,312 +108,25 @@
     </section>
   </main>
 
+  <div id="detailOverlay" class="fs-modal-backdrop">
+    <div class="card ops-detail-modal">
+      <div class="ops-detail-head">
+        <h3 id="detailTitle">Error Details</h3>
+        <button id="detailCloseBtn" class="btn">Close</button>
+      </div>
+      <p><strong>Error:</strong> <span id="detailError"></span></p>
+      <pre id="detailBody" class="ops-detail-pre"></pre>
+      <div class="ops-actions-row">
+        <button id="copyErrorBtn" class="btn">Copy Error</button>
+        <button id="copyRawBtn" class="btn">Copy Raw</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/config.js"></script>
+  <script src="../js/admin-ui.js"></script>
+  <script src="../js/admin-api.js"></script>
   <script src="../js/admin-shell.js"></script>
-  <script type="module">
-    import { supabase, getCurrentProfile } from "../auth/auth-client.js";
-
-    const roleAllow = new Set(["admin", "superadmin", "subgroup_admin", "pastor"]);
-    const missingTables = new Set();
-    const selected = new Set();
-    let records = [];
-
-    const $ = (id) => document.getElementById(id);
-
-    const isMissingTable = (error) => {
-      const msg = String(error?.message || "").toLowerCase();
-      return error?.code === "42P01" || msg.includes("does not exist") || msg.includes("relation");
-    };
-
-    const findAny = (obj, keys) => keys.map((k) => obj?.[k]).find((v) => v !== null && v !== undefined && v !== "") || "-";
-
-    function keyOf(rec) {
-      return `${rec.source}:${rec.id}`;
-    }
-
-    function setState(msg) {
-      $("state").textContent = msg;
-      $("state").classList.remove("hidden");
-      $("tableWrap").classList.add("hidden");
-    }
-
-    function showTable() {
-      $("state").classList.add("hidden");
-      $("tableWrap").classList.remove("hidden");
-    }
-
-    function fmtDate(v) {
-      if (!v || v === "-") return "-";
-      const d = new Date(v);
-      return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString();
-    }
-
-    function chip(v) {
-      const s = String(v || "").toLowerCase();
-      if (s.includes("fail") || s.includes("error")) return "bad";
-      if (s.includes("pending") || s.includes("retry")) return "warn";
-      return "info";
-    }
-
-    async function ensureAccess() {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        window.location.href = "login.html";
-        return null;
-      }
-      const profile = await getCurrentProfile();
-      if (!profile || !roleAllow.has(profile.role)) {
-        setState("Access denied for this account.");
-        return null;
-      }
-      return profile;
-    }
-
-    async function loadFailedSyncs() {
-      const { data, error } = await supabase
-        .from("failed_syncs")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(200);
-
-      if (error) {
-        if (isMissingTable(error)) {
-          missingTables.add("failed_syncs");
-          return [];
-        }
-        throw error;
-      }
-
-      return (data || []).map((row) => ({
-        source: "failed_syncs",
-        id: findAny(row, ["id", "sync_id"]),
-        target: findAny(row, ["provider", "system", "sync_type", "entity_type"]),
-        status: findAny(row, ["status", "sync_status"]),
-        error: findAny(row, ["error_message", "last_error", "failure_reason"]),
-        updatedAt: findAny(row, ["updated_at", "created_at"]),
-        raw: row,
-      }));
-    }
-
-    async function loadFailedEmails() {
-      const { data, error } = await supabase
-        .from("email_queue")
-        .select("*")
-        .in("status", ["Failed", "failed", "ERROR", "error"])
-        .order("updated_at", { ascending: false })
-        .limit(200);
-
-      if (error) {
-        if (isMissingTable(error)) {
-          missingTables.add("email_queue");
-          return [];
-        }
-        throw error;
-      }
-
-      return (data || []).map((row) => ({
-        source: "email_queue",
-        id: findAny(row, ["id", "queue_id"]),
-        target: findAny(row, ["recipient_email", "template_key", "subject"]),
-        status: findAny(row, ["status"]),
-        error: findAny(row, ["error_message", "last_error"]),
-        updatedAt: findAny(row, ["updated_at", "created_at"]),
-        raw: row,
-      }));
-    }
-
-    async function loadOptional(table, label) {
-      const { data, error } = await supabase
-        .from(table)
-        .select("*")
-        .in("status", ["Failed", "failed", "ERROR", "error"])
-        .order("updated_at", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        if (isMissingTable(error)) {
-          missingTables.add(table);
-          return [];
-        }
-        return [];
-      }
-
-      return (data || []).map((row) => ({
-        source: table,
-        id: findAny(row, ["id", "sync_id", "queue_id"]),
-        target: label,
-        status: findAny(row, ["status", "sync_status"]),
-        error: findAny(row, ["error_message", "last_error", "failure_reason"]),
-        updatedAt: findAny(row, ["updated_at", "created_at"]),
-        raw: row,
-      }));
-    }
-
-    function renderRows() {
-      if (!records.length) {
-        setState("No failed records found.");
-        $("summary").textContent = "0 records";
-        return;
-      }
-
-      const html = records.map((rec) => {
-        const key = keyOf(rec);
-        return `
-          <tr>
-            <td><input type="checkbox" class="row-check" data-key="${key}" ${selected.has(key) ? "checked" : ""} /></td>
-            <td>${rec.source}</td>
-            <td>${rec.target}</td>
-            <td><span class="chip ${chip(rec.status)}">${rec.status}</span></td>
-            <td class="muted-cell" title="${rec.error}">${rec.error}</td>
-            <td>${fmtDate(rec.updatedAt)}</td>
-            <td>
-              <div class="actions">
-                <button class="btn js-retry" data-key="${key}">Retry</button>
-                <button class="btn js-resolve" data-key="${key}">Resolve</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join("");
-
-      $("rows").innerHTML = html;
-      $("summary").textContent = `${records.length} record${records.length === 1 ? "" : "s"}`;
-      showTable();
-    }
-
-    async function applyRetry(rec) {
-      if (rec.source === "email_queue") {
-        const { error } = await supabase.from("email_queue").update({ status: "Pending", error_message: null, updated_at: new Date().toISOString() }).eq("id", rec.id);
-        return !error;
-      }
-
-      const payloads = [
-        { status: "retry_queued", retry_requested_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-        { status: "pending", updated_at: new Date().toISOString() },
-        { updated_at: new Date().toISOString() },
-      ];
-
-      for (const payload of payloads) {
-        const { error } = await supabase.from(rec.source).update(payload).eq("id", rec.id);
-        if (!error) return true;
-      }
-      return false;
-    }
-
-    async function applyResolve(rec) {
-      if (rec.source === "email_queue") {
-        const { error } = await supabase.from("email_queue").update({ status: "Resolved", updated_at: new Date().toISOString() }).eq("id", rec.id);
-        return !error;
-      }
-
-      const payloads = [
-        { resolved_at: new Date().toISOString(), status: "resolved", updated_at: new Date().toISOString() },
-        { status: "resolved", updated_at: new Date().toISOString() },
-      ];
-
-      for (const payload of payloads) {
-        const { error } = await supabase.from(rec.source).update(payload).eq("id", rec.id);
-        if (!error) return true;
-      }
-      return false;
-    }
-
-    async function runForSelection(handler) {
-      const selectedRows = records.filter((rec) => selected.has(keyOf(rec)));
-      if (!selectedRows.length) return;
-      for (const rec of selectedRows) {
-        await handler(rec);
-      }
-      await refresh();
-    }
-
-    async function refresh() {
-      setState("Loading failed records...");
-      missingTables.clear();
-      selected.clear();
-
-      const [syncRows, emailRows, moodleRows, mailchimpRows] = await Promise.all([
-        loadFailedSyncs(),
-        loadFailedEmails(),
-        loadOptional("moodle_sync", "Moodle"),
-        loadOptional("mailchimp_sync", "Mailchimp"),
-      ]);
-
-      records = [...syncRows, ...emailRows, ...moodleRows, ...mailchimpRows]
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-
-      renderRows();
-      renderMigrationNotes();
-      $("selectAll").checked = false;
-    }
-
-    function renderMigrationNotes() {
-      const items = [...missingTables].map((t) => `Missing optional/required table: ${t}`);
-      $("migrationNotes").innerHTML = items.length
-        ? items.map((i) => `<li>${i}</li>`).join("")
-        : "<li>No missing-table migrations detected for this view.</li>";
-    }
-
-    function wireEvents() {
-      $("refreshBtn").addEventListener("click", refresh);
-      $("retrySelectedBtn").addEventListener("click", () => runForSelection(applyRetry));
-      $("resolveSelectedBtn").addEventListener("click", () => runForSelection(applyResolve));
-
-      $("selectAll").addEventListener("change", (e) => {
-        selected.clear();
-        if (e.target.checked) {
-          records.forEach((rec) => selected.add(keyOf(rec)));
-        }
-        renderRows();
-      });
-
-      $("rows").addEventListener("change", (e) => {
-        const check = e.target.closest(".row-check");
-        if (!check) return;
-        const key = check.dataset.key;
-        if (check.checked) selected.add(key);
-        else selected.delete(key);
-      });
-
-      $("rows").addEventListener("click", async (e) => {
-        const retryBtn = e.target.closest(".js-retry");
-        const resolveBtn = e.target.closest(".js-resolve");
-
-        if (retryBtn) {
-          const rec = records.find((r) => keyOf(r) === retryBtn.dataset.key);
-          if (!rec) return;
-          retryBtn.disabled = true;
-          await applyRetry(rec);
-          await refresh();
-        }
-
-        if (resolveBtn) {
-          const rec = records.find((r) => keyOf(r) === resolveBtn.dataset.key);
-          if (!rec) return;
-          resolveBtn.disabled = true;
-          await applyResolve(rec);
-          await refresh();
-        }
-      });
-    }
-
-    async function init() {
-      const profile = await ensureAccess();
-      if (!profile) return;
-
-      window.FSAdminShell?.mount({
-        active: "health",
-        title: "Foundation School Admin",
-        profileName: profile.full_name || profile.email || "Admin",
-        role: profile.role,
-        breadcrumbs: [{ label: "Admin", href: "admin-dashboard.html" }, "Retry Center"],
-      });
-
-      wireEvents();
-      await refresh();
-    }
-
-    init();
-  </script>
+  <script type="module" src="../js/failed-sync-retry-center.js"></script>
 </body>
 </html>

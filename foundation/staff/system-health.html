@@ -138,7 +138,11 @@
       rows.push(checkRow("Auth Session", session.data?.session ? "ok" : "warn", session.data?.session ? "Active session found." : "No active session detected."));
 
       try {
-        const rlsProbe = await supabase.from("profiles").select("user_id").limit(1);
+       const rlsProbe = await supabase
+  .from("admin_users")
+  .select("auth_user_id")
+  .limit(1);
+        //const rlsProbe = await supabase.from("profiles").select("user_id").limit(1);
         if (rlsProbe.error) {
           rows.push(checkRow("RLS Visibility", "warn", rlsProbe.error.message));
         } else {

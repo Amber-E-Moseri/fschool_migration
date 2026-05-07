@@ -50,16 +50,41 @@ export async function getSessionOrNull() {
 export async function getCurrentProfile() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
+
   const user = userData?.user;
   if (!user) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("user_id,email,full_name,role,is_active")
-    .eq("user_id", user.id)
+  // Current/legacy admin profile table
+  const { data: adminUser, error: adminError } = await supabase
+    .from("admin_users")
+    .select("auth_user_id,email,full_name,name,role,status,active")
+    .or(`auth_user_id.eq.${user.id},email.eq.${user.email}`)
     .maybeSingle();
 
-  if (error) throw error;
-  return data || null;
+  if (adminError) {
+    console.warn("Admin user lookup failed:", adminError.message);
+  }
+
+  if (adminUser) {
+    return {
+      user_id: adminUser.auth_user_id || user.id,
+      email: adminUser.email || user.email,
+      full_name: adminUser.full_name || adminUser.name || user.email,
+      role: adminUser.role || "admin",
+      is_active:
+        adminUser.active !== false &&
+        String(adminUser.status || "").toLowerCase() !== "suspended",
+      source: "admin_users",
+    };
+  }
+
+  return {
+    user_id: user.id,
+    email: user.email,
+    full_name: user.user_metadata?.full_name || user.email,
+    role: "user",
+    is_active: true,
+    source: "auth",
+  };
 }
 

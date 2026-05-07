@@ -42,6 +42,16 @@
       if (!err) return 'Unknown error';
       if (typeof err === 'string') return err;
       return String(err.message || err);
+    },
+    async invokeRetryWorker(client, payload) {
+      const { data, error } = await client.functions.invoke("retry-worker", {
+        body: payload
+      });
+      if (error) throw error;
+      if (!data?.ok) {
+        throw new Error(String(data?.error || "retry-worker call failed"));
+      }
+      return data;
     }
   };
 
