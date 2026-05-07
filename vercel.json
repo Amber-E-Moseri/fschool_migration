@@ -1,0 +1,14 @@
+{
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/", "destination": "/foundation/auth/login.html", "permanent": false },
+    { "source": "/staff", "destination": "/foundation/staff/admin-portal.html", "permanent": false },
+    { "source": "/auth", "destination": "/foundation/auth/login.html", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/staff/:path*", "destination": "/foundation/staff/:path*" },
+    { "source": "/auth/:path*", "destination": "/foundation/auth/:path*" },
+    { "source": "/teacher/:path*", "destination": "/foundation/teacher/:path*" }
+  ]
+}
