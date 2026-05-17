@@ -174,7 +174,7 @@
       state.filtered = state.rows.filter((row) => {
         const actionVal = String(pick(row, ["action", "event", "type"]) || "").toLowerCase();
         const statusVal = String(pick(row, ["status", "result", "outcome"]) || "").toLowerCase();
-        const actorVal = String(pick(row, ["actor", "actor_email", "changed_by", "created_by", "user_email"]) || "").toLowerCase();
+        const actorVal = String(pick(row, ["actor", "actor_email", "changed_by", "created_by", "user_email"]) || "").toLowerCase().replace("@system", "");
 
         if (action && !actionVal.includes(action)) return false;
         if (status && !statusVal.includes(status)) return false;
@@ -202,7 +202,10 @@
       const rowsHtml = state.filtered.map((row) => {
         const when = pick(row, ["created_at", "logged_at", "inserted_at", "timestamp"]);
         const action = pick(row, ["action", "event", "type"]) || "-";
-        const actor = pick(row, ["actor", "actor_email", "changed_by", "created_by", "user_email"]) || "-";
+        const actorRaw = pick(row, ["actor", "actor_email", "changed_by", "created_by", "user_email"]) || "-";
+        const actor = actorRaw.endsWith("@system")
+          ? actorRaw.replace("@system", " (system)")
+          : actorRaw;
         const entity = pick(row, ["entity_type", "target_type", "resource_type"]) || "-";
         const entityId = pick(row, ["entity_id", "target_id", "resource_id"]) || "-";
         const status = pick(row, ["status", "result", "outcome"]) || "-";

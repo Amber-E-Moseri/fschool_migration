@@ -239,6 +239,7 @@
       const phone = String($("addTeacherPhone")?.value || "").trim();
       const groupId = String($("addTeacherGroupId")?.value || "").trim();
       const subgroupId = String($("addTeacherSubgroupId")?.value || "").trim();
+      const fellowshipCode = String($("addTeacherFellowshipCode")?.value || "").trim().toUpperCase();
       const notes = String($("addTeacherNotes")?.value || "").trim();
 
       if (!fullName) {
@@ -267,6 +268,7 @@
             phone,
             group_id: groupId,
             subgroup_id: subgroupId,
+            fellowship_code: fellowshipCode || null,
             notes,
           },
         });

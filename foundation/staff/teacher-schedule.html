@@ -201,12 +201,34 @@ async function apiGet(action, params){
          .is("deleted_at", null)
          .order("full_name")
       );
+      const subgroupRows = await window.FSApi.select("teachers", (q) =>
+        q.select("teacher_id,subgroup_id")
+         .is("deleted_at", null)
+      );
+      const campusRows = await window.FSApi.select("fellowship_map", (q) =>
+        q.select("subgroup_id,timezone,active")
+         .eq("active", true)
+      );
+      const timezoneBySubgroup = new Map();
+      (campusRows || []).forEach((r) => {
+        const sg = String(r?.subgroup_id || "").trim();
+        const tz = String(r?.timezone || "").trim();
+        if (!sg || !tz || timezoneBySubgroup.has(sg)) return;
+        timezoneBySubgroup.set(sg, tz);
+      });
+      const subgroupByTeacher = new Map();
+      (subgroupRows || []).forEach((r) => {
+        const teacherId = String(r?.teacher_id || "").trim();
+        const subgroupId = String(r?.subgroup_id || "").trim();
+        if (!teacherId || !subgroupId) return;
+        subgroupByTeacher.set(teacherId, subgroupId);
+      });
       return {
         ok: true,
         data: (data || []).map((r) => ({
           teacherName: r.full_name || "",
           teacherEmail: r.email || "",
-          teacherTimezone: "America/Toronto"
+          teacherTimezone: timezoneBySubgroup.get(subgroupByTeacher.get(String(r.teacher_id || "").trim()) || "") || null
         }))
       };
     }

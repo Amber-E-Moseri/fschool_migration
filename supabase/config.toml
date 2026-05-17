@@ -26,3 +26,7 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/missed-class-detector/index.ts"
 # Schedule is defined in ./functions/missed-class-detector/config.toml
+
+[functions.email-sender]
+enabled = true
+verify_jwt = false

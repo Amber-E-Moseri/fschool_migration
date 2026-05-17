@@ -12,6 +12,7 @@ export async function createTeacherDirectAction(ctx: ActionContext): Promise<Res
   const phone = String(params?.phone || "").trim() || null;
   const groupId = String(params?.group_id || "").trim() || null;
   const subgroupId = String(params?.subgroup_id || "").trim() || null;
+  const fellowshipCode = String(params?.fellowship_code || "").trim().toUpperCase() || null;
   const notes = String(params?.notes || "").trim() || null;
   const actorEmail = safeLower(auth?.user?.email) || auth?.user?.id || "admin";
 
@@ -49,6 +50,7 @@ export async function createTeacherDirectAction(ctx: ActionContext): Promise<Res
         p_phone: phone,
         p_group_id: groupId,
         p_subgroup_id: subgroupId,
+        p_fellowship_code: fellowshipCode,
         p_notes: notes,
         p_actor_email: actorEmail,
       }),

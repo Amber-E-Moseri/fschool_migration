@@ -24,7 +24,7 @@
   <main class="main fs-page fs-wrap-xl">
     <section class="hero">
       <h1 class="hero-title">Moodle Settings</h1>
-      <p class="hero-sub">Manage batch Moodle course mappings. Tokens stay server-side in Supabase secrets.</p>
+      <p class="hero-sub">Manage batch Moodle course mappings.</p>
     </section>
 
     <section class="card">
@@ -175,7 +175,7 @@
 
       const activeBatchIds = (batches.data || []).map((b) => b.batch_id).filter(Boolean);
       if (!activeBatchIds.length) return msg("No active batches found.", true);
-      const groups = [...new Set((fm.data || []).map((r) => r.subgroup_id || r.group_id).filter(Boolean))];
+      const groups = [...new Set((fm.data || []).map((r) => r.group_id).filter(Boolean))];
       const desired = [];
       activeBatchIds.forEach((batch_id) => groups.forEach((group_id) => desired.push({ batch_id, group_id })));
       const existingKeys = new Set(mappings.map((m) => `${m.batch_id}::${m.group_id}`));
@@ -197,7 +197,7 @@
       msg("Testing Moodle connection...");
       try {
         const { data, error } = await supabase.functions.invoke("moodle-sync", {
-          body: { action: "testConnection" }
+          body: { action: "test" }
         });
         if (error) return msg(error.message || "Connection test failed.", true);
         if (!data?.ok) return msg(data?.error || "Connection test failed.", true);
@@ -220,6 +220,5 @@
   </script>
 </body>
 </html>
-
 
 

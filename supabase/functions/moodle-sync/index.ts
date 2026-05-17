@@ -151,25 +151,30 @@ async function callMoodle(url: string, token: string, wsfunction: string, params
   return data;
 }
 
-async function findOrCreateMoodleUser(
-  moodleUrl: string,
-  moodleToken: string,
-  email: string,
-  fullName: string,
-): Promise<{ userId: string; tempPassword: string | null; usernameUsed: string }> {
+async function findOrCreateMoodleUser(moodleUrl: string, moodleToken: string, email: string, fullName: string): Promise<{ userId: string; tempPassword: string | null; usernameUsed: string }> {
   const username = safeUsernameFromEmail(email);
-  const found = await callMoodle(moodleUrl, moodleToken, "core_user_get_users_by_field", {
-    field: "email",
-    "values[0]": email,
+  const tempPassword = crypto.randomUUID().slice(0, 8).toUpperCase() + "a!1";
+
+  const found = await callMoodle(moodleUrl, moodleToken, "core_user_get_users", {
+    "criteria[0][key]": "email",
+    "criteria[0][value]": email,
   });
 
-  const existing = Array.isArray(found) ? found[0] : null;
+  const existing = Array.isArray(found?.users) ? found.users[0] : null;
   if (existing?.id) {
-    return { userId: String(existing.id), tempPassword: null, usernameUsed: username };
+    // Reset password so we always have a usable temp password to send
+    try {
+      await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
+        "users[0][id]": String(existing.id),
+        "users[0][password]": tempPassword,
+      });
+    } catch (resetErr) {
+      console.error("MOODLE_PASSWORD_RESET_FAILED", { email, error: resetErr });
+    }
+    return { userId: String(existing.id), tempPassword, usernameUsed: String(existing.username || username) };
   }
 
   const { firstName, lastName } = splitName(fullName);
-  const tempPassword = crypto.randomUUID().slice(0, 8).toUpperCase() + "a!1";
 
   try {
     const created = await callMoodle(moodleUrl, moodleToken, "core_user_create_users", {
@@ -187,66 +192,50 @@ async function findOrCreateMoodleUser(
   } catch (error) {
     const c = classifyError(error);
     if (c.code === "ALREADY_EXISTS") {
-      try {
-        const foundAgain = await callMoodle(moodleUrl, moodleToken, "core_user_get_users_by_field", {
-          field: "email",
-          "values[0]": email,
-        });
-        const fallback = Array.isArray(foundAgain) ? foundAgain[0] : null;
-        if (fallback?.id) return { userId: String(fallback.id), tempPassword: null, usernameUsed: username };
-      } catch (_) {
-        // ignore lookup errors, proceed to alt username
+      // Try email lookup first
+      const foundAgain = await callMoodle(moodleUrl, moodleToken, "core_user_get_users", {
+        "criteria[0][key]": "email",
+        "criteria[0][value]": email,
+      });
+      const fallback = Array.isArray(foundAgain?.users) ? foundAgain.users[0] : null;
+      if (fallback?.id) {
+        try {
+          await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
+            "users[0][id]": String(fallback.id),
+            "users[0][password]": tempPassword,
+          });
+        } catch (_) {}
+        return { userId: String(fallback.id), tempPassword, usernameUsed: String(fallback.username || username) };
       }
 
-      try {
-        const foundByUsername = await callMoodle(moodleUrl, moodleToken, "core_user_get_users_by_field", {
-          field: "username",
-          "values[0]": username,
-        });
-        const fallbackByUsername = Array.isArray(foundByUsername) ? foundByUsername[0] : null;
-        if (fallbackByUsername?.id) return { userId: String(fallbackByUsername.id), tempPassword: null, usernameUsed: username };
-      } catch (_) {
-        // ignore lookup errors, proceed to alt username
+      // Try username lookup as fallback
+      const foundByUsername = await callMoodle(moodleUrl, moodleToken, "core_user_get_users", {
+        "criteria[0][key]": "username",
+        "criteria[0][value]": username,
+      });
+      const fallbackByUsername = Array.isArray(foundByUsername?.users) ? foundByUsername.users[0] : null;
+      if (fallbackByUsername?.id) {
+        try {
+          await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
+            "users[0][id]": String(fallbackByUsername.id),
+            "users[0][password]": tempPassword,
+          });
+        } catch (_) {}
+        return { userId: String(fallbackByUsername.id), tempPassword, usernameUsed: String(fallbackByUsername.username || username) };
       }
 
-      try {
-        const safeEmailUsername = safeUsernameFromEmail(email);
-        const foundBySafeEmailUsername = await callMoodle(moodleUrl, moodleToken, "core_user_get_users_by_field", {
-          field: "username",
-          "values[0]": safeEmailUsername,
-        });
-        const fallbackBySafeEmailUsername = Array.isArray(foundBySafeEmailUsername) ? foundBySafeEmailUsername[0] : null;
-        if (fallbackBySafeEmailUsername?.id) {
-          return {
-            userId: String(fallbackBySafeEmailUsername.id),
-            tempPassword: null,
-            usernameUsed: safeEmailUsername,
-          };
-        }
-      } catch (_) {
-        // ignore lookup errors, proceed to alt username
-      }
-
-      // All lookups empty - username reserved by deleted user.
-      // Retry with modified username to avoid conflict.
-      const altUsername = username + "_r" + Date.now().toString().slice(-3);
-      try {
-        const retried = await callMoodle(moodleUrl, moodleToken, "core_user_create_users", {
-          "users[0][username]": altUsername,
-          "users[0][firstname]": firstName,
-          "users[0][lastname]": lastName || "-",
-          "users[0][email]": email,
-          "users[0][auth]": "manual",
-          "users[0][password]": tempPassword,
-        });
-        const retriedId = Array.isArray(retried) ? retried[0]?.id : null;
-        if (retriedId) {
-          console.log("MOODLE_ALT_USERNAME_USED", { original: username, alt: altUsername, email });
-          return { userId: String(retriedId), tempPassword, usernameUsed: altUsername };
-        }
-      } catch (retryErr) {
-        console.error("MOODLE_ALT_USERNAME_FAILED", retryErr);
-      }
+      // Username reserved by deleted account — create with alternate username
+      const altUsername = username + "_r" + Date.now().toString().slice(-4);
+      const retried = await callMoodle(moodleUrl, moodleToken, "core_user_create_users", {
+        "users[0][username]": altUsername,
+        "users[0][firstname]": splitName(fullName).firstName,
+        "users[0][lastname]": splitName(fullName).lastName || "-",
+        "users[0][email]": email,
+        "users[0][auth]": "manual",
+        "users[0][password]": tempPassword,
+      });
+      const retriedId = Array.isArray(retried) ? retried[0]?.id : null;
+      if (retriedId) return { userId: String(retriedId), tempPassword, usernameUsed: altUsername };
     }
     throw error;
   }
@@ -343,17 +332,6 @@ Deno.serve(async (req) => {
     const forceId = String(payload?.id || "").trim();
     const limitInput = Number(payload?.limit || 5) || 5;
     const limit = Math.max(1, Math.min(50, limitInput)); // Max 50 to prevent abuse
-
-    const staleThresholdIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    await db
-      .from("moodle_enrollment_sync")
-      .update({
-        sync_status: "PENDING",
-        error_code: "TIMEOUT_RESET",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("sync_status", "PROCESSING")
-      .lt("updated_at", staleThresholdIso);
 
     const baseQuery = db
       .from("moodle_enrollment_sync")
@@ -468,23 +446,12 @@ Deno.serve(async (req) => {
           throw new Error("No Moodle course mapping found for this assignment");
         }
 
-        const { userId: moodleUserId, tempPassword, usernameUsed } = await findOrCreateMoodleUser(
-          MOODLE_URL,
-          MOODLE_TOKEN,
-          email,
-          fullName,
-        );
+        const { userId: moodleUserId, tempPassword, usernameUsed } = await findOrCreateMoodleUser(MOODLE_URL, MOODLE_TOKEN, email, fullName);
         await ensureEnrollment(MOODLE_URL, MOODLE_TOKEN, moodleUserId, courseId);
 
-        const existingPayload = (row.payload as Record<string, unknown> | null) ?? {};
         await patchSyncRow(db, id, {
           sync_status: "SYNCED" satisfies SyncStatus,
           moodle_user_id: moodleUserId,
-          temp_password: tempPassword,
-          payload: {
-            ...existingPayload,
-            moodle_username: usernameUsed,
-          },
           course_id: courseId,
           moodle_course_id: courseId,
           synced_at: nowIso,
@@ -493,68 +460,62 @@ Deno.serve(async (req) => {
           error_code: null,
         });
 
-        const credentialPatch = {
-          moodle_username: usernameUsed,
-          moodle_temp_password: tempPassword,
-          moodle_url: MOODLE_URL,
-        };
-        const queueLookup = db
-          .from("email_queue")
-          .select("id,payload")
-          .eq("recipient_email", email)
-          .eq("template_key", "class_assigned")
-          .order("created_at", { ascending: false })
-          .limit(1);
-        const { data: queueRow } = traceId
-          ? await queueLookup.eq("trace_id", traceId).maybeSingle()
-          : await queueLookup.maybeSingle();
-        if (queueRow?.id) {
-          const mergedPayload = {
-            ...(queueRow.payload as Record<string, unknown> | null ?? {}),
-            ...credentialPatch,
-          };
-          await db
-            .from("email_queue")
-            .update({ payload: mergedPayload })
-            .eq("id", queueRow.id);
-        }
-
-        void fetch(`${SUPABASE_URL}/functions/v1/email-sender`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SERVICE_KEY}`,
-            apikey: SERVICE_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
-        })
-          .then(async (res) => {
-            if (!res.ok) {
-              const bodyText = await res.text().catch(() => "");
-              console.error("MOODLE_SYNC_EMAIL_SENDER_TRIGGER_FAILED", {
-                id,
-                email,
-                status: res.status,
-                body: bodyText,
-              });
-              return;
-            }
-            console.log("MOODLE_SYNC_EMAIL_SENDER_TRIGGERED", { id, email });
-          })
-          .catch((triggerErr) => {
-            console.error("MOODLE_SYNC_EMAIL_SENDER_TRIGGER_ERROR", {
-              id,
-              email,
-              error: triggerErr,
-            });
-          });
-
         await logAudit(db, "MOODLE_SYNC_SUCCESS", id, "SUCCESS", {
           email,
           course_id: courseId,
           moodle_user_id: moodleUserId,
           ...(traceId ? { trace_id: traceId } : {}),
         });
+
+        // Queue moodle_credentials email with login details
+        const nameParts = fullName.trim().split(/\s+/);
+        const firstName = nameParts[0] || fullName;
+
+        // Get class_label from the welcome email payload
+        const { data: welcomeRow } = await db
+          .from("email_queue")
+          .select("payload")
+          .eq("recipient_email", email)
+          .eq("template_key", "foundation_welcome")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const welcomePayload = (welcomeRow?.payload as Record<string, unknown> | null) ?? {};
+        const classLabel = String(welcomePayload.class_label || welcomePayload.class_time || "");
+
+        const { error: emailQueueError } = await db.from("email_queue").insert({
+          recipient_email: email,
+          recipient_name: fullName,
+          template_key: "moodle_credentials",
+          subject: "Your Moodle Access — Rock Solid Foundation School",
+          status: "Pending",
+          trace_id: traceId || null,
+          payload: {
+            first_name: firstName,
+            full_name: fullName,
+            email,
+            moodle_url: "https://rocksolid.lwcanada.org/",
+            moodle_username: usernameUsed,
+            moodle_temp_password: tempPassword,
+            class_label: classLabel,
+            trace_id: traceId || null,
+          },
+        });
+
+        if (emailQueueError) {
+          console.error("MOODLE_SYNC_CREDENTIALS_EMAIL_QUEUE_FAILED", { id, email, error: emailQueueError });
+        } else {
+          // Trigger email-sender immediately so credentials go out fast
+          void fetch(`${SUPABASE_URL}/functions/v1/email-sender`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${SERVICE_KEY}`,
+              apikey: SERVICE_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+          }).catch((err) => console.error("MOODLE_SYNC_EMAIL_SENDER_TRIGGER_ERROR", { id, email, error: err }));
+        }
 
         summary.synced += 1;
       } catch (error) {
