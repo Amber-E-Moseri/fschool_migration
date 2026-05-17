@@ -1,8 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  corsHeaders,
-  applyAllowedOrigin,
+  corsHeaders as sharedCorsHeaders,
   jsonResponse,
   classifyError,
   validateRequired,
@@ -12,10 +11,26 @@ import {
   safeLogAudit,
 } from "../shared-utils/edge-hardening.ts";
 
+const allowedOrigins = [
+  "https://rocksolidsuite.netlify.app",
+  "https://rocksolid.lwcanada.org",
+];
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = String(req.headers.get("origin") || req.headers.get("Origin") || "").trim();
+  const matchedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  return {
+    "Access-Control-Allow-Origin": matchedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  };
+}
+
 Deno.serve(async (req) => {
-  applyAllowedOrigin(req);
+  const corsHeaders = getCorsHeaders(req);
+  Object.assign(sharedCorsHeaders, corsHeaders);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
   try {

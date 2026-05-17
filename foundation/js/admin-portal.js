@@ -13,6 +13,7 @@ let currentBatches   = []     // cached batch list for batch management
 let batchModalMode   = 'create' // 'create' | 'edit'
 let batchModalId     = null   // batch_id being edited
 let moodleModalBatchId = null // batch_id open in Moodle config modal
+const QUERY_ROW_CAP = 5000
 
 // ── Init ──────────────────────────────────────────────────────
 async function init() {
@@ -649,6 +650,7 @@ async function loadTeachers() {
       .select('teacher_id, full_name, email, subgroup_id, status, active')
       .is('deleted_at', null)
       .order('full_name')
+      .range(0, QUERY_ROW_CAP - 1)
     q = scopeQuery(q)
     const { data, error } = await q
     if (error) throw error
@@ -674,7 +676,10 @@ async function loadTeachers() {
 async function loadAvailPastor() {
   try {
     // Get teacher IDs in this pastor's subgroups
-    let tq = db.from('teachers').select('teacher_id').is('deleted_at', null)
+    let tq = db.from('teachers')
+      .select('teacher_id')
+      .is('deleted_at', null)
+      .range(0, QUERY_ROW_CAP - 1)
     tq = scopeQuery(tq)
     const { data: tData, error: tErr } = await tq
     if (tErr) throw tErr
@@ -686,6 +691,7 @@ async function loadAvailPastor() {
       .select('id, teacher_id, subgroup_id, day, time_slot, status, batch_id, teachers(full_name)')
       .in('teacher_id', ids)
       .order('day')
+      .range(0, QUERY_ROW_CAP - 1)
 
     if (error) throw error
 

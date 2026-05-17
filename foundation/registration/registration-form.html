@@ -508,29 +508,29 @@ body::before {
    FAITH QUESTIONS
    ============================================================ */
 .faith-group { display: grid; gap: 0; }
-.faith-question { margin-bottom: 20px; }
+.faith-question { margin-bottom: 24px; }
 .faith-question:last-child { margin-bottom: 0; }
 .faith-q-label {
-  font-size: 11px; font-weight: 700;
+  font-size: 12px; font-weight: 800;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: .07em;
-  margin-bottom: 8px;
+  letter-spacing: .08em;
+  margin-bottom: 10px;
 }
 
 /* Screen 4 overrides */
 #screen-4 { overflow-x: hidden; }
-#screen-4 .q-wrap { width: 100%; padding: 36px 16px 80px; }
+#screen-4 .q-wrap { width: 100%; padding: 40px 20px 104px; }
 #screen-4 .q-num { font-size: 12px; color: var(--muted); letter-spacing: .08em; margin-bottom: 10px; }
 #screen-4 .q-num::after { content: none; }
-#screen-4 .radio-grid { gap: 6px; }
-#screen-4 .radio-card { margin-bottom: 6px; }
+#screen-4 .radio-grid { gap: 10px; }
+#screen-4 .radio-card { margin-bottom: 8px; }
 #screen-4 .radio-card:last-child { margin-bottom: 0; }
-#screen-4 .radio-label { min-height: 40px; padding: 8px 14px; border-radius: 12px; font-size: 14px; align-items: center; }
+#screen-4 .radio-label { min-height: 52px; padding: 11px 14px; border-radius: 12px; font-size: 14px; align-items: center; }
 #screen-4 .radio-key { min-width: 28px; width: 28px; height: 28px; font-size: 12px; align-self: center; }
-#screen-4 .q-actions { margin-top: 24px; }
+#screen-4 .q-actions { margin-top: 28px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 #screen-4 .btn-back, #screen-4 .btn-next {
-  height: 44px; padding: 0 24px; font-size: 14px; border-radius: 10px; font-weight: 700;
+  height: 46px; padding: 0 24px; font-size: 14px; border-radius: 10px; font-weight: 700;
 }
 
 /* Screen 5 (fellowship) compact layout */
@@ -837,8 +837,10 @@ body::before {
   .enter-hint { display: none; }
   .q-label { font-size: clamp(24px, 7vw, 36px); }
   .field-input { font-size: clamp(20px, 6vw, 28px); }
-  #screen-4 .q-wrap { padding: 36px 16px 80px; }
-  #screen-4 .q-actions { flex-wrap: nowrap; justify-content: space-between; gap: 10px; margin-top: 24px; }
+  #screen-4 .q-wrap { padding: 44px 18px 118px; }
+  #screen-4 .faith-question { margin-bottom: 26px; }
+  #screen-4 .radio-label { min-height: 56px; padding: 12px 16px; }
+  #screen-4 .q-actions { flex-wrap: nowrap; justify-content: space-between; gap: 10px; margin-top: 28px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
   #screen-4 .btn-back, #screen-4 .btn-next { width: calc(50% - 5px); justify-content: center; }
   .success-sub { max-width: 320px; white-space: normal; text-wrap: balance; }
   .summary-card { margin-left: 16px; margin-right: 16px; }
