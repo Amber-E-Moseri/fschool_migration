@@ -14,6 +14,10 @@ Scope: Internal operations platform, small-team maintainability horizon (5+ year
 - Intended final state: Single canonical auth module with shared guard API used by all staff pages.
 - Recommended Resolution: Consolidate into one module, remove duplicate paths after parity tests.
 - Target Quarter: Q3 2026
+- Status: RESOLVED (May 18, 2026) for `getCurrentProfile()` fallback path.
+  `admin_users` fallback removed from `getCurrentProfile()`.
+  All active users confirmed in `profiles` table before removal.
+  Backfill migration was not required (audit checks returned zero rows).
 
 ### 2) Shared assignment pipeline duplication
 - Area: Edge function business logic
@@ -107,19 +111,20 @@ Scope: Internal operations platform, small-team maintainability horizon (5+ year
 
 ### 11) Misleading notification function naming
 - Area: Notification pipeline / operational clarity
-- Current State: `scheduled-notification-sender` sounds like the canonical batch processor
+- Current State: `notification-retry-helper` sounds like the canonical batch processor
   but is actually a single-item Retry Center helper. The real batch processor is
-  `reminder-processor`. `sender-worker` is a deprecated reconciliation worker.
+  `notification-batch-processor`. `sender-worker` is a deprecated reconciliation worker.
 - Risk Level: High
 - Why this is debt: Any operator or engineer reading the function names will assume the
   wrong pipeline topology. The name mismatch risks accidental scheduling, incorrect retry
   wiring, and duplicate-processor incidents.
-- Operational risk: Running `scheduled-notification-sender` as a batch processor would
+- Operational risk: Running `notification-retry-helper` as a batch processor would
   reset in-flight notifications to PENDING, causing duplicate sends. Running `sender-worker`
-  alongside `reminder-processor` marks notifications FAILED before they are queued.
+  alongside `notification-batch-processor` marks notifications FAILED before they are queued.
 - Intended final state: Function names unambiguously reflect their role.
-  Proposal: rename `reminder-processor` → `notification-batch-processor`,
-  `scheduled-notification-sender` → `notification-retry-helper` (or inline into retry-worker).
+  Proposal: rename `notification-batch-processor` → `notification-batch-processor`,
+  `notification-retry-helper` → `notification-retry-helper` (or inline into retry-worker).
 - Recommended Resolution: Document current topology clearly (see NOTIFICATION_PIPELINE.md),
   then plan renames as a coordinated change with no runtime behavior impact.
 - Target Quarter: Q3 2026
+

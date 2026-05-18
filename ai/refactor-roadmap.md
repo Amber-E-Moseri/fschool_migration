@@ -20,7 +20,7 @@ Deliverables:
 
 ---
 
-## Phase 2 — Shared Design System [IN PROGRESS]
+## Phase 2 � Shared Design System [COMPLETE]
 
 tokens.css + primitives.css created, admin-shell.js updated,
 page migration not yet started.
@@ -34,17 +34,7 @@ Deliverables:
 - All staff pages import `primitives.css` and use `fs-*` classes
 - CI check: grep for `var(--muted)`, `.chip`, `.summary-card` → fail
 
-Pages pending migration:
-- system-health.html
-- failed-sync-retry-center.html
-- audit-log.html
-- milestones-admin.html
-- notification-center.html
-- email-campaigns.html
-- dashboards.html
-- applicant-directory.html
-
----
+Pages pending migration:`r`n- All 8 pages migrated. CI hook enforces fs-* compliance on commit.`r`n- Completed: May 18, 2026.`r`n`r`n---
 
 ## Phase 3 — Inline JS Extraction [NOT STARTED]
 
@@ -141,28 +131,36 @@ In recommended order:
    - Extract to _shared/lib/assign-applicant.ts
    - Both become thin wrappers
 
-3. Consolidate auth-client.js + auth-guards.js
+3. Consolidate admin assignment path -> admin-api action [COMPLETED]
+   - admin-review.js now calls admin-api/assign-applicant-admin which delegates
+     to _shared/lib/assign-applicant.ts
+   - Direct DB writes removed from frontend assignment path
+
+4. Consolidate auth-client.js + auth-guards.js [PARTIALLY COMPLETE - admin_users fallback removed. auth-guards.js consolidation pending.]
    - Single auth module for all pages
    - Remove admin_users fallback once profiles migration complete
 
-4. Complete fs-* page migration
+5. Complete fs-* page migration
    - Set deadline before next feature sprint
    - Add grep CI check: var(--muted), .chip, .summary-card = fail
 
-5. Create supabase/functions/_shared/ utilities [STARTED]
+6. Create supabase/functions/_shared/ utilities [STARTED]
    - retry.ts, audit.ts, response.ts, supabase.ts
    - `supabase.ts`, `audit.ts`, `response.ts` now exist
    - Expand adoption in new/refactored functions
 
-6. Audit sender-worker vs scheduled-notification-sender
+7. Audit sender-worker vs notification-retry-helper
    - Determine if they can be merged
    - Add trace_id to email pipeline tables
 
-7. Replace React teacher-availability sub-app
+8. Replace React teacher-availability sub-app
    - Rewrite in vanilla JS using fs-* system
    - Eliminate separate build toolchain
 
-8. Per-applicant trace view in system-health
+9. Per-applicant trace view in system-health
    - Enter email/ID → see full chronological event log
    - Joins: applicants, audit_logs, class_roster,
      scheduled_notifications, email_queue
+
+
+

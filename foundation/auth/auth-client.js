@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// Consumers: foundation/index.html, foundation/auth/{login.html,logout.js,role-sidebar.js}, foundation/js/{admin-review.js,admin-shell.js,applicant-directory.js,failed-sync-retry-center.js,notification-center.js,operational-trace.js,teacher-shell.js,teacher-management.js}, foundation/staff/*, foundation/teacher/*.
+// Consumers: foundation/index.html, foundation/auth/{login.html,logout.js}, foundation/js/{admin-review.js,admin-shell.js,applicant-directory.js,failed-sync-retry-center.js,notification-center.js,operational-trace.js,teacher-shell.js,teacher-management.js}, foundation/staff/*, foundation/teacher/*.
 
 function readRuntimeConfig() {
   if (window.FSConfig?.ensureOrRender) {
@@ -61,8 +61,9 @@ export const supabase = createClient(
   },
 );
 
-// Canonical teacher landing URL (relative to /foundation).
+// Canonical landing URLs (relative to /foundation).
 export const TEACHER_LANDING_PATH = "teacher/index.html";
+export const ADMIN_LANDING_PATH = "staff/admin-dashboard.html";
 
 export async function getSessionOrNull() {
   const { data } = await supabase.auth.getSession();
@@ -141,6 +142,7 @@ const ROLES = Object.freeze({
   SUBGROUP_ADMIN: "subgroup_admin",
   PASTOR: "pastor",
   PRINCIPAL: "principal",
+  REGIONAL_SECRETARY: "regional_secretary",
   TEACHER: "teacher",
   PENDING: "pending",
 });
@@ -155,11 +157,17 @@ const ADMIN_ROLES = new Set([
 
 const STAFF_ROLES = new Set([
   ...ADMIN_ROLES,
+  ROLES.REGIONAL_SECRETARY,
   ROLES.TEACHER,
 ]);
 
 const DASHBOARD_ROLES = new Set([
   ...STAFF_ROLES,
+]);
+
+const REGIONAL_SECRETARY_ROLES = new Set([
+  ROLES.REGIONAL_SECRETARY,
+  ...ADMIN_ROLES,
 ]);
 
 export function canonicalRole(rawRole) {
@@ -180,7 +188,11 @@ export function isStaff(role) {
 }
 
 export function isTeacher(role) {
-  return canonicalRole(role) === ROLES.TEACHER;
+  return STAFF_ROLES.has(canonicalRole(role));
+}
+
+export function isRegionalSecretary(role) {
+  return canonicalRole(role) === ROLES.REGIONAL_SECRETARY;
 }
 
 export function isPending(role) {
@@ -227,9 +239,8 @@ async function selectFirstWorkingMaybeSingle({ table, matchers, projections, sta
  * Returns the canonical profile for the current user.
  *
  * Resolution order:
- *   1. profiles table (canonical)  - keyed by id = auth user UUID
- *   2. admin_users table (legacy)  - keyed by auth_user_id or email
- *   3. Auth user metadata fallback - role: "user", active: true
+ *   1. profiles table (canonical)  - keyed by user_id = auth user UUID
+ *   2. Auth user metadata fallback - role: "user", active: true
  *
  * Throws only on auth errors (JWT expired / no session).
  * Returns null if no user is signed in.
@@ -263,32 +274,6 @@ export async function getCurrentProfile() {
     warnAuthResolution("profiles lookup exhausted projections", profilesResult.error, { user_id: user.id });
   }
 
-  const email = String(user.email || "").trim();
-  const adminResult = await selectFirstWorkingMaybeSingle({
-    table: "admin_users",
-    stage: "admin_users lookup",
-    matchers: [{ type: "or", value: `auth_user_id.eq.${user.id},email.eq.${email}` }],
-    projections: [
-      "auth_user_id,email,full_name,name,role,is_active,active,status",
-      "auth_user_id,email,full_name,name,role,active,status",
-      "auth_user_id,email,full_name,name,role,status",
-      "auth_user_id,email,full_name,name,role,active",
-      "auth_user_id,email,full_name,name,role",
-      "auth_user_id,email,role",
-      "auth_user_id,role",
-    ],
-  });
-
-  if (adminResult.data) {
-    return normalizeProfileRecord("admin_users", adminResult.data, user, {
-      defaultRole: "admin",
-      defaultActive: true,
-    });
-  }
-  if (adminResult.error && !isMissingTableError(adminResult.error)) {
-    warnAuthResolution("admin_users lookup exhausted projections", adminResult.error, { user_id: user.id });
-  }
-
   const metadataProfile = normalizeProfileRecord("auth", {}, user, {
     defaultRole: "user",
     defaultActive: true,
@@ -299,6 +284,26 @@ export async function getCurrentProfile() {
     role: metadataProfile.role,
   });
   return metadataProfile;
+}
+
+/**
+ * Returns the teacher record linked to the given email, or null if none.
+ * Only returns records where active=true, status=ACTIVE, deleted_at IS NULL.
+ */
+export async function getLinkedTeacherRecord(userEmail) {
+  const email = String(userEmail || "").trim().toLowerCase();
+  if (!email) return null;
+  const { data } = await supabase
+    .from("teachers")
+    .select("teacher_id,email,full_name,status,active,deleted_at")
+    .ilike("email", email)
+    .is("deleted_at", null)
+    .eq("active", true)
+    .eq("status", "ACTIVE")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data || null;
 }
 
 /**
@@ -399,7 +404,7 @@ export async function requireAuth(allowedRoles = []) {
     return null;
   }
 
-  if (isTeacher(profile.role)) {
+  if (canonicalRole(profile.role) === ROLES.TEACHER) {
     const authEmail = String(session.user?.email || "").trim().toLowerCase();
     const { data: teacherRow, error: teacherErr } = await supabase
       .from("teachers")
@@ -426,7 +431,8 @@ export async function requireAuth(allowedRoles = []) {
 }
 
 supabase.auth.onAuthStateChange((event) => {
-  if (event === "SIGNED_OUT") {
+  if (event === "SIGNED_OUT" || event === "TOKEN_REFRESH_FAILED") {
     redirectToLogin();
   }
 });
+
