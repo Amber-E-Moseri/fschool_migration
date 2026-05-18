@@ -16,15 +16,25 @@ This document defines the canonical SQL authority and ordering for:
 
 ## Deterministic Migration Order
 Apply migrations in strict lexical filename order:
-1. `001_*.sql` -> `006_*.sql`
+1. `000_baseline_squash.sql`
 2. `2026*.sql` (timestamp-prefixed)
 
 Current ordering is deterministic because all migration filenames are zero-padded and lexically sortable.
 
+## Baseline Squash (2026-05-18)
+- `000_baseline_squash.sql` replaces the historical baseline migrations:
+  - `001_initial_schema.sql`
+  - `002_seed_data.sql`
+  - `003_rls_policies.sql`
+  - `004_batch_management.sql`
+  - `005_add_applicants_availability.sql`
+  - `006_notification_system.sql`
+- Original files are preserved (not deleted) under:
+  - `supabase/migrations/archive/pre-baseline/`
+- Safety rule: never apply `000_baseline_squash.sql` to an existing database that already ran the original baseline migrations.
+
 ## Canonical Ownership by Concern
-- **Base schema**: `001_initial_schema.sql`
-- **Base seed/reference data**: `002_seed_data.sql`
-- **Legacy broad RLS baseline**: `003_rls_policies.sql`
+- **Base schema + seed + baseline RLS + early batch/notification setup**: `000_baseline_squash.sql`
 - **Feature migrations**: `004+` and timestamped files
 - **Current RBAC/RLS hardening baseline**:
   - `202605061400_rls_hardening.sql`
@@ -66,4 +76,3 @@ Current ordering is deterministic because all migration filenames are zero-padde
 - Function definitions converge on latest migration state
 - No RLS policy references dropped helper functions
 - Views are defined in migrations only
-
