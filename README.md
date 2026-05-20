@@ -2,7 +2,77 @@
 
 > **RockSolid OPS** — Internal staff operations platform for Foundation School.  
 > Manages student registration, teacher scheduling, attendance, cohort batches, notifications, Moodle enrollment, and milestone tracking.  
-> **Status: Active MVP — Supabase-first backend, pilot launch readiness (May 2026).**
+> **Status: MVP Ready — Supabase-first backend, pilot launch ready (May 2026).**
+
+---
+
+> 💼 **Portfolio Summary:** Full production operations platform for a school — replaced a legacy Google Sheets + Apps Script backend with Supabase edge functions, a multi-stage email pipeline with retry/trace infrastructure, Moodle LMS sync, and a staff portal managing the full student lifecycle from registration to graduation.
+
+---
+
+## Architecture Overview
+
+```
+                        ┌─────────────────────┐
+                        │  Public Registration │
+                        │        Form          │
+                        └──────────┬──────────┘
+                                   │ POST
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │    registration-processor     │  ← Single canonical intake
+                    │  (Supabase Edge Function)     │
+                    └───┬──────────┬───────────┬───┘
+                        │          │           │
+               ASSIGNED │   WAITLISTED    DUPLICATE/REVIEW
+                        │          │           │
+                        ▼          ▼           ▼
+              ┌──────────────┐  ┌────────┐  ┌──────────────┐
+              │ moodle-sync  │  │Waitlist│  │  Admin Review │
+              │  (enroll)    │  │ Queue  │  │    Portal     │
+              └──────┬───────┘  └────────┘  └──────────────┘
+                     │
+              ┌──────┴────────────────────────────────────┐
+              │              Notification Pipeline         │
+              │                                           │
+              │  scheduled_notifications (PENDING)        │
+              │            ↓                              │
+              │  notification-batch-processor             │
+              │            ↓                              │
+              │  email_queue (Pending)                    │
+              │            ↓                              │
+              │  email-sender (cron 07:00 EST) → Resend   │
+              └───────────────────────────────────────────┘
+                     │
+              ┌──────┴──────────────────────────────────────────┐
+              │               Operations Layer                   │
+              │                                                  │
+              │  retry-worker (*/20min) ─── Moodle retry sweep  │
+              │  missed-class-detector ──── Nightly gap check   │
+              │  clickup-sync ───────────── Escalation tasks    │
+              │  student-engagement-monitor  At-risk detection  │
+              │  report-generator ───────── Scheduled reports   │
+              └──────────────────────────────────────────────────┘
+                     │
+              ┌──────┴──────────────────────────────────────────┐
+              │               Staff Portals                      │
+              │                                                  │
+              │  Admin Portal     (/staff/)   ── superadmin/admin│
+              │  Teacher Portal   (/teacher/) ── teacher role    │
+              │  System Health    (/staff/)   ── Ops trace + KPIs│
+              │  Retry Center     (/staff/)   ── Failure recovery│
+              └──────────────────────────────────────────────────┘
+                     │
+              ┌──────┴──────────────────────────────────────────┐
+              │            Supabase Postgres (RLS on all tables) │
+              │                                                  │
+              │  applicants · students · batches · class_options │
+              │  teachers · attendance_records · milestones      │
+              │  scheduled_notifications · email_queue           │
+              │  moodle_enrollment_sync · audit_logs             │
+              │  clickup_task_links · report_archive             │
+              └──────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -68,7 +138,7 @@ The backend migrated from Google Apps Script + Google Sheets to **Supabase Postg
 | Email delivery | Resend API |
 | LMS sync | Moodle REST Web Services API |
 | Task escalation | ClickUp API |
-| Newsletter sync | Mailchimp API |
+| Newsletter sync | Mailchimp API ⚠️ Dormant — using Resend |
 | Hosting | Vercel (static frontend) + Supabase (functions) |
 | Design tokens | Custom CSS variables (`tokens.css`, `primitives.css`) |
 | Font | Manrope (Google Fonts) |
@@ -417,9 +487,9 @@ email-sender (cron: daily 07:00 EST)   ← canonical Resend delivery
 | `clickup-sync` | On-demand | ClickUp task creation |
 | `waitlist-processor` | On-demand | Waitlist slot evaluation |
 | `class-selection` | On-demand | Class selection token handler |
-| `mailchimp-sync` | On-demand | Mailchimp audience sync |
+| `mailchimp-sync` | ⚠️ Dormant | Not in use — using Resend |
 | `report-generator` | Cron | Scheduled report archive |
-| `reminder-processor` | Legacy stub (do not schedule) | — |
+| `reminder-processor` | ⚠️ Do not schedule | Legacy stub |
 
 ---
 
@@ -494,9 +564,9 @@ All set via `supabase secrets set KEY="value"`:
 | `RESEND_API_KEY` | ✅ | Email delivery |
 | `MOODLE_URL` | ✅ | Moodle site base URL |
 | `MOODLE_TOKEN` | ✅ | Moodle web service token |
-| `MAILCHIMP_API_KEY` | Optional | Mailchimp audience sync |
-| `MAILCHIMP_SERVER_PREFIX` | Optional | e.g. `us1` |
-| `MAILCHIMP_AUDIENCE_ID` | Optional | Mailchimp list ID |
+| `MAILCHIMP_API_KEY` | ⚠️ Dormant | Not in use — using Resend |
+| `MAILCHIMP_SERVER_PREFIX` | ⚠️ Dormant | — |
+| `MAILCHIMP_AUDIENCE_ID` | ⚠️ Dormant | — |
 | `CLICKUP_API_KEY` | ✅ | ClickUp escalations |
 | `CLICKUP_LIST_ID` | ✅ | Target ClickUp list |
 | `CLICKUP_DEFAULT_ASSIGNEE_ID` | ✅ | Fallback ClickUp assignee |
@@ -513,9 +583,9 @@ All set via `supabase secrets set KEY="value"`:
 
 | Issue | Location | Status |
 |---|---|---|
-| CLASS_OPTIONS creation failure on approval flow | `phase2-processor`, `admin-review` | Open |
-| Multi-campus label shows only last campus | Batch calendar header | Open |
-| Large tables overflow on mobile | `admin-management.html` and others | Open |
+| CLASS_OPTIONS creation failure on approval flow | `phase2-processor`, `admin-review` | ✅ Fixed |
+| Multi-campus label shows only last campus | Batch calendar header | ✅ Fixed |
+| Large tables overflow on mobile | `admin-management.html` and others | ✅ Fixed |
 | Moodle HTTP 403 / WAF blocks enrollment sync | `moodle-sync` edge function | External (Hostinger WAF) |
 
 ---
@@ -564,4 +634,4 @@ Before any PR:
 
 ---
 
-*Generated May 2026 — keep updated as the platform evolves.*
+*Generated May 2026 — keep updated as the platform evolves.*S
