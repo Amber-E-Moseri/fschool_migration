@@ -1,6 +1,6 @@
-# Foundation School — Operations Platform
+# Rock Solid Ops — Operations Platform
 
-> **RockSolid LMS AID** — Internal staff operations platform for Foundation School.  
+> **RockSolid OPS** — Internal staff operations platform for Foundation School.  
 > Manages student registration, teacher scheduling, attendance, cohort batches, notifications, Moodle enrollment, and milestone tracking.  
 > **Status: Active MVP — Supabase-first backend, pilot launch readiness (May 2026).**
 
