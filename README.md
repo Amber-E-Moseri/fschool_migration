@@ -6,7 +6,7 @@
 
 ---
 
-> 💼 **Portfolio Summary:** Full production operations platform for a school — replaced a legacy Google Sheets + Apps Script backend with Supabase edge functions, a multi-stage email pipeline with retry/trace infrastructure, Moodle LMS sync, and a staff portal managing the full student lifecycle from registration to graduation.
+> 💼 **Summary:** Full production operations platform for a school — replaced a legacy Google Sheets + Apps Script backend with Supabase edge functions, a multi-stage email pipeline with retry/trace infrastructure, Moodle LMS sync, and a staff portal managing the full student lifecycle from registration to graduation.
 
 ---
 
