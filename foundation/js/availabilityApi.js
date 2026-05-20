@@ -1,5 +1,5 @@
 /**
- * availabilityApi.js  — Supabase-backed
+ * availabilityApi.js  - Supabase-backed
  * Set in .env:
  *   VITE_SUPABASE_URL
  *   VITE_SUPABASE_ANON_KEY
@@ -16,7 +16,7 @@ const FALLBACK_CAMPUSES = [
   { code: 'UALBERTA', name: 'University of Alberta',             group: 'WS', subgroup: 'WSGA',  timezone: 'America/Edmonton' },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────
+// - Helpers -
 
 function sbHeaders(extra = {}) {
   return {
@@ -60,7 +60,7 @@ function to12h(time24) {
   return `${h12}:${mi} ${ap}`;
 }
 
-// ── Public API ────────────────────────────────────────────────
+// - Public API -
 
 export async function getCampuses() {
   try {
@@ -80,7 +80,7 @@ export async function getCampuses() {
     console.log('[TA] getCampuses:', normalized.length, 'rows');
     return normalized.length ? normalized : FALLBACK_CAMPUSES;
   } catch (e) {
-    console.error('[TA] getCampuses failed — using fallback:', e.message);
+    console.error('[TA] getCampuses failed - using fallback:', e.message);
     return FALLBACK_CAMPUSES;
   }
 }
@@ -118,7 +118,7 @@ export async function getScheduledClassConflicts(campusCodes) {
       const fCodes = raw.split(',').map(s => s.trim().toUpperCase());
       if (codes.some(c => fCodes.includes(c)) && r.day && r.class_time) {
         const time12 = to12h(r.class_time);
-        conflicts.push({ day: r.day, time: time12, label: `${r.teacher_name || 'Class'} — ${r.day} ${time12}` });
+        conflicts.push({ day: r.day, time: time12, label: `${r.teacher_name || 'Class'} - ${r.day} ${time12}` });
       }
     });
     return conflicts;
@@ -157,26 +157,21 @@ export async function submitAvailability(payload) {
     throw new Error('No availability slots to submit');
   }
 
-  console.log('[TA] submitAvailability — raw payload:', payload);
+  console.log('[TA] submitAvailability - raw payload:', payload);
 
-  // 1. Resolve teacher_id from email
-  const uniqueEmails = [...new Set(payload.map(p => p.teacherEmail).filter(Boolean))];
+  const uniqueEmails = [...new Set(payload.map((p) => p.teacherEmail).filter(Boolean))];
   const teacherMap = {};
   for (const email of uniqueEmails) {
     try {
       const rows = await sbGet('teachers', `email=eq.${encodeURIComponent(email)}&select=teacher_id`);
       if (rows.length) {
         teacherMap[email] = rows[0].teacher_id;
-        console.log('[TA] resolved teacher_id for', email, '→', rows[0].teacher_id);
-      } else {
-        console.warn('[TA] no teacher found for email:', email);
       }
     } catch (e) {
       console.error('[TA] teacher lookup failed for', email, e.message);
     }
   }
 
-  // 2. Get active/open batch — no fallback hardcodes; fail explicitly if none found
   let batchId = null;
   try {
     const batches = await sbGet(
@@ -184,52 +179,63 @@ export async function submitAvailability(payload) {
       'or=(active.eq.true,registration_open.eq.true)&archived=eq.false&order=start_date.desc&limit=1&select=batch_id'
     );
     if (batches.length) batchId = batches[0].batch_id;
-    console.log('[TA] using batch_id:', batchId);
   } catch (_) {}
 
   if (!batchId) {
-    console.error('[TA] No active or open batch found. Cannot submit availability.');
     return { ok: false, error: 'No active batch found. Please contact your administrator.' };
   }
 
-  // 3. Build rows — one per slot
-  const rows = [];
+  const bySlot = new Map();
   for (const p of payload) {
     const teacher_id = teacherMap[p.teacherEmail] || p.teacherID || null;
-    const time_slot  = to24h(p.teacherTime);
+    const time_slot = to24h(p.teacherTime);
+    const day = String(p.teacherDay || p.day || '').trim();
+    if (!teacher_id || !time_slot || !day) continue;
 
-    if (!teacher_id) {
-      console.warn('[TA] skipping slot — no teacher_id for:', p.teacherEmail, p.teacherID);
-      continue;
+    const explicit = Array.isArray(p.selectedCampusCodes) ? p.selectedCampusCodes : [];
+    const fallback = p.campusCode ? [p.campusCode] : [];
+    const selected = [...new Set([...explicit, ...fallback].map((v) => String(v || '').trim().toUpperCase()).filter(Boolean))];
+
+    const key = `${teacher_id}__${day}__${time_slot}`;
+    if (!bySlot.has(key)) {
+      bySlot.set(key, {
+        teacher_id,
+        day,
+        time_slot,
+        selected_fellowship_codes: new Set(),
+        created_by: p.teacherEmail || null,
+        month: p.month || '',
+        year: p.year || '',
+      });
     }
-    if (!time_slot) {
-      console.warn('[TA] skipping slot — could not parse time:', p.teacherTime);
-      continue;
+    const row = bySlot.get(key);
+    selected.forEach((code) => row.selected_fellowship_codes.add(code));
+  }
+
+  const rows = [];
+  for (const row of bySlot.values()) {
+    const selectedCodes = [...row.selected_fellowship_codes];
+    if (!selectedCodes.length) {
+      throw new Error(`No campus selected for ${row.day} ${row.time_slot}. Select at least one campus.`);
     }
     rows.push({
-      teacher_id,
-      day:       p.teacherDay,
-      time_slot,
-      batch_id:  batchId,
-      status:    'Tentative',
-      notes:     `Campus: ${p.campusCode || '—'} · ${p.month || ''} ${p.year || ''}`.trim(),
-      created_by: p.teacherEmail || null,
+      teacher_id: row.teacher_id,
+      day: row.day,
+      time_slot: row.time_slot,
+      batch_id: batchId,
+      status: 'Tentative',
+      selected_fellowship_codes: selectedCodes,
+      notes: `Teacher portal submission${row.month || row.year ? ` - ${row.month} ${row.year}` : ''}`.trim(),
+      created_by: row.created_by,
     });
   }
 
   if (!rows.length) {
-    throw new Error(
-      `No valid rows to insert. Payload had ${payload.length} entries but none matched a teacher. ` +
-      `Emails tried: ${uniqueEmails.join(', ')}. ` +
-      `Make sure teachers are in the teachers table with matching email addresses.`
-    );
+    throw new Error('No valid rows to insert. Ensure teacher + day + time are present.');
   }
 
-  console.log('[TA] inserting rows:', rows);
-
-  // 4. Insert with upsert on the unique constraint
   const res = await fetch(`${SUPABASE_URL}/rest/v1/teacher_availability`, {
-    method:  'POST',
+    method: 'POST',
     headers: sbHeaders({
       'Prefer': 'resolution=merge-duplicates,return=representation',
     }),
@@ -238,18 +244,18 @@ export async function submitAvailability(payload) {
 
   if (!res.ok) {
     const txt = await res.text();
-    console.error('[TA] insert failed:', txt);
     throw new Error(`Submit failed: ${txt}`);
   }
 
   const result = await res.json();
-  console.log('[TA] insert result:', result);
   return { inserted: result.length, updated: rows.length - result.length, deactivated: 0 };
 }
-
 export function buildDefaultConfig() {
   return {
     mode:    'supabase',
     appName: 'Foundation School Scheduler',
   };
 }
+
+
+

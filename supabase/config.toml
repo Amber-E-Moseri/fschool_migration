@@ -61,3 +61,13 @@ entrypoint = "./functions/teacher-portal-api/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/waitlist-processor/index.ts"
+
+[functions.class-selection]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/class-selection/index.ts"
+
+[functions.admin-api]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/admin-api/index.ts"

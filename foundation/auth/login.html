@@ -1,35 +1,79 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rock Solid Login</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
     body {
-      background: var(--color-bg, #f5f3ff);
+      background: #f5f3ff;
       margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: #1E1630;
+      font-family: "DM Sans", system-ui, -apple-system, sans-serif;
     }
     .login-card {
+      width: 100%;
       max-width: 400px;
-      background: #fff;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-      padding: 32px;
+      background: #ffffff;
+      border: 1px solid #e9ddff;
+      border-radius: 16px;
+      padding: 40px;
+      box-sizing: border-box;
     }
     .login-card .login-title {
       font-size: 24px;
       font-weight: 700;
-      color: #4C2A92 !important;
+      color: #4C2A92;
+      margin: 0 0 8px 0;
+    }
+    .login-subtitle {
+      font-size: 14px;
+      color: #6f6881;
+      margin: 0 0 16px 0;
+    }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
     .login-input {
+      width: 100%;
+      box-sizing: border-box;
+      background: #ffffff;
       border: 1px solid #e0d9ff;
       border-radius: 8px;
+      padding: 12px 14px;
+      color: #1E1630;
+      outline: none;
     }
+    .login-input::placeholder { color: #9c91b7; }
     .login-submit {
       width: 100%;
+      background: #4C2A92;
+      color: #ffffff;
+      border: 0;
       border-radius: 8px;
+      padding: 12px;
+      font-weight: 600;
+      cursor: pointer;
     }
+    .login-submit:disabled { opacity: .7; cursor: not-allowed; }
+    .login-msg {
+      font-size: 14px;
+      color: #6f6881;
+      margin: 12px 0 0 0;
+      line-height: 1.5;
+    }
+    .login-msg.error { color: #b42318; }
+    .login-msg.success { color: #067647; }
+    .hidden { display: none !important; }
     #forgotPasswordBtn {
       appearance: none;
       -webkit-appearance: none;
@@ -38,7 +82,7 @@
       background-image: none !important;
       border: 0 !important;
       box-shadow: none !important;
-      color: var(--color-primary, #7c3aed) !important;
+      color: #4C2A92 !important;
       text-decoration: underline;
       text-underline-offset: 2px;
       padding: 0 !important;
@@ -49,27 +93,32 @@
       width: auto !important;
       display: inline;
     }
+    @media (max-width: 520px) {
+      body { padding: 16px; }
+      .login-card { padding: 28px; }
+    }
   </style>
 </head>
-<body class="min-h-screen text-[#1E1630] flex items-center justify-center p-6">
-  <div class="w-full border border-purple-100 rounded-2xl login-card">
-    <h1 class="text-[#4C2A92] mb-4 login-title">Rock Solid Login</h1>
-    <form id="loginForm" class="space-y-3">
-      <input id="email" type="email" required placeholder="Email" class="w-full px-3 py-2 login-input" />
-      <input id="password" type="password" required placeholder="Password" class="w-full px-3 py-2 login-input" />
-      <button type="submit" class="px-4 py-2 bg-[#4C2A92] text-white font-semibold login-submit">Sign In</button>
+<body>
+  <div class="login-card">
+    <h1 class="login-title">Rock Solid Login</h1>
+    <p class="login-subtitle">Sign in to continue.</p>
+    <form id="loginForm" class="login-form">
+      <input id="email" type="email" required placeholder="Email" class="login-input" />
+      <input id="password" type="password" required placeholder="Password" class="login-input" />
+      <button type="submit" class="login-submit">Sign In</button>
       <a id="forgotPasswordBtn" href="#">Forgot password?</a>
     </form>
-    <p id="msg" class="text-sm text-slate-600 mt-3"></p>
-    <p id="supportMsg" class="text-sm text-slate-600 mt-1 hidden"></p>
+    <p id="msg" class="login-msg"></p>
+    <p id="supportMsg" class="login-msg hidden"></p>
   </div>
 
   <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
   <script type="module">
-    import { supabase, getCurrentProfile, TEACHER_LANDING_PATH, ADMIN_LANDING_PATH, isRegionalSecretary, getLinkedTeacherRecord } from "./auth-client.js";
+    import { supabase, getCurrentProfile, TEACHER_LANDING_PATH, ADMIN_LANDING_PATH } from "./auth-client.js";
 
-    // If a recovery token is in the hash, this is a reset-password link —
+    // If a recovery token is in the hash, this is a reset-password link â€”
     // hand it off immediately before auth-client.js can process it as a login.
     const _hash = window.location.hash || "";
     if (_hash.includes("type=recovery")) {
@@ -99,6 +148,18 @@
     const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
     const supportMsg = document.getElementById("supportMsg");
     const supportEmail = String(window.FS_CONFIG?.SUPPORT_EMAIL || "support@rocksolid.school").trim() || "support@rocksolid.school";
+    let loginPending = false;
+    const withTimeout = async (promise, ms, label) => {
+      let timer = null;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+      });
+      try {
+        return await Promise.race([promise, timeout]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
 
     function setSupportLine(show) {
       if (!supportMsg) return;
@@ -122,32 +183,46 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (loginPending) return;
+      if (!window.FS_CONFIG?.SUPABASE_URL || !window.FS_CONFIG?.SUPABASE_ANON_KEY) {
+        msg.classList.add("error");
+        msg.textContent = "Runtime config is missing (SUPABASE_URL/SUPABASE_ANON_KEY).";
+        return;
+      }
+      loginPending = true;
       if (submitBtn) submitBtn.disabled = true;
-      if (submitBtn) submitBtn.textContent = "Signing in…";
+      if (submitBtn) submitBtn.textContent = "Signing in...";
       msg.textContent = "";
+      msg.classList.remove("error", "success");
       setSupportLine(false);
 
       const email = emailInput.value.trim();
       const password = document.getElementById("password").value;
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15000,
+        "Sign-in request",
+      );
       if (error) {
         const raw = String(error.message || "");
         const isInvalidCreds = raw.toLowerCase().includes("invalid login credentials");
+        msg.classList.add("error");
         msg.textContent = isInvalidCreds
           ? "Incorrect email or password. Please try again."
-          : "Sign in failed. Please try again or contact support.";
+          : `Sign in failed: ${raw || "Please try again or contact support."}`;
         setSupportLine(false);
         if (submitBtn) {
           submitBtn.disabled = false;
           submitBtn.textContent = "Sign In";
         }
+        loginPending = false;
         return;
       }
 
       let profile = null;
       try {
-        profile = await getCurrentProfile();
+        profile = await withTimeout(getCurrentProfile(), 12000, "Profile lookup");
       } catch (_) {
         msg.textContent = "Sign in failed. Please try again or contact support.";
         setSupportLine(false);
@@ -155,6 +230,7 @@
           submitBtn.disabled = false;
           submitBtn.textContent = "Sign In";
         }
+        loginPending = false;
         return;
       }
       if (!profile) {
@@ -164,6 +240,7 @@
           submitBtn.disabled = false;
           submitBtn.textContent = "Sign In";
         }
+        loginPending = false;
         return;
       }
       const role = String(profile.role || "").trim().toLowerCase();
@@ -177,29 +254,24 @@
           submitBtn.disabled = false;
           submitBtn.textContent = "Sign In";
         }
+        loginPending = false;
         return;
       }
 
-      // Pure teacher role → always teacher portal
+      // Pure teacher role â†’ always teacher portal
       if (role === "teacher") {
         window.location.href = appPath(TEACHER_LANDING_PATH);
         return;
       }
 
-      // Superadmin / admin → always admin portal, no check needed
+      // Superadmin / admin â†’ always admin portal, no check needed
       if (role === "superadmin" || role === "admin") {
         window.location.href = safeNext();
         return;
       }
 
-      // Other staff roles: check for linked teacher record → portal chooser
+      // Other staff roles: always route to staff/admin portal
       if (["pastor", "principal", "subgroup_admin", "regional_secretary"].includes(role)) {
-        const teacherRec = await getLinkedTeacherRecord(email);
-        if (teacherRec) {
-          showPortalChooser(role);
-          return;
-        }
-        // No teacher record → go to appropriate staff landing
         const staffLanding = role === "regional_secretary" ? "staff/dashboards.html" : ADMIN_LANDING_PATH;
         window.location.href = appPath(staffLanding);
         return;
@@ -207,23 +279,6 @@
 
       window.location.href = safeNext();
     });
-
-    function showPortalChooser(role) {
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Sign In"; }
-      const overlay = document.getElementById("portalChooserOverlay");
-      if (!overlay) return;
-      overlay.style.display = "flex";
-
-      document.getElementById("goAdmin").addEventListener("click", () => {
-        sessionStorage.setItem("rs_portal_choice", "admin");
-        const staffLanding = role === "regional_secretary" ? "staff/dashboards.html" : ADMIN_LANDING_PATH;
-        window.location.href = appPath(staffLanding);
-      });
-      document.getElementById("goTeacher").addEventListener("click", () => {
-        sessionStorage.setItem("rs_portal_choice", "teacher");
-        window.location.href = appPath(TEACHER_LANDING_PATH);
-      });
-    }
 
     forgotPasswordBtn.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -237,7 +292,7 @@
       msg.textContent = "Sending reset link...";
       setSupportLine(false);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/foundation/auth/reset-password.html`,
+        redirectTo: `${window.location.origin}${appPath("auth/reset-password.html")}`,
       });
       if (error) {
         msg.textContent = "Could not send reset link. Please try again or contact support.";
@@ -246,18 +301,8 @@
       msg.textContent = "Check your email for a reset link.";
     });
   </script>
-  <!-- Portal chooser overlay — shown for dual-role staff users -->
-  <div id="portalChooserOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:16px;padding:32px;max-width:360px;width:calc(100% - 32px);box-shadow:0 8px 40px rgba(0,0,0,0.25);text-align:center;">
-      <div style="font-size:32px;margin-bottom:12px;">&#x1F44B;</div>
-      <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;color:#1E1630;">Welcome back!</h2>
-      <p style="margin:0 0 24px;color:#6f6881;font-size:14px;line-height:1.6;">You have access to both portals.<br>Where would you like to go?</p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <button id="goAdmin" style="padding:12px 20px;background:#4C2A92;color:#fff;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">Admin Portal</button>
-        <button id="goTeacher" style="padding:12px 20px;background:#fff;color:#4C2A92;border:2px solid #4C2A92;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">Teacher Portal</button>
-      </div>
-    </div>
-  </div>
   <script src="../ui/premium-shell.js"></script>
 </body>
 </html>
+
+

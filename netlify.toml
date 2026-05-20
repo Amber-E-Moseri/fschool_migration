@@ -29,3 +29,27 @@
   from = "/auth/*"
   to = "/foundation/auth/:splat"
   status = 200
+
+[[redirects]]
+  from = "/supabase/*"
+  to = "/foundation/auth/login.html"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/ai/*"
+  to = "/foundation/auth/login.html"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/archive/*"
+  to = "/foundation/auth/login.html"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/foundation/docs/*"
+  to = "/foundation/auth/login.html"
+  status = 302
+  force = true

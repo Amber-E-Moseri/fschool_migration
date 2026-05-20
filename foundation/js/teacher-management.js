@@ -16,11 +16,15 @@
     classMap: new Map(), // teacher_id → class_option_id
     activeTab: "PENDING",
     loading: false,
+    linkTargetTeacherId: null,
+    unlinkTargetTeacherId: null,
   };
 
   const $ = (id) => document.getElementById(id);
-    const isSuperAdmin  = () => String(state.profile?.role || "").toLowerCase() === "superadmin";
+  const isSuperAdmin  = () => String(state.profile?.role || "").toLowerCase() === "superadmin";
   const isAdmin       = () => ["admin", "superadmin"].includes(String(state.profile?.role || "").toLowerCase());
+  const isRegionalSecretary = () => String(state.profile?.role || "").toLowerCase() === "regional_secretary";
+  const isOperationalRole = () => isAdmin() || isRegionalSecretary();
 
   const isMissingTable = (error) => {
     const msg = String(error?.message || "").toLowerCase();
@@ -35,6 +39,14 @@
     if (typeof FSAdminUi.toast === "function") { FSAdminUi.toast(message, type); return; }
     console[type === "error" ? "error" : "log"](message);
   };
+
+  function assertRpcOk(result, fallback = "Operation failed") {
+    if (result?.error) throw result.error;
+    if (result?.data && typeof result.data === "object" && result.data.ok === false) {
+      throw new Error(String(result.data.error || fallback));
+    }
+    return result?.data || null;
+  }
 
   // ── Status chip ────────────────────────────────────────────────────────────
   function statusChip(status) {
@@ -115,14 +127,24 @@
     const normalized = FSAdminApi.normalizeTeacherStatus(row.status, row.active);
     const id       = esc(row.teacher_id);
     const emailEsc = esc(row.email || "");
-    const linkBtn  = `<button class="btn" data-action="linkauth" data-id="${id}" data-email="${emailEsc}" title="Link auth account">Link Auth</button>`;
+    const linked = Boolean(row.teacher_user_id);
+    const allowAuthLinking = isAdmin();
+    const linkBtn  = allowAuthLinking
+      ? `<button class="btn" data-action="linkauth" data-id="${id}" data-email="${emailEsc}" title="Link auth account">${linked ? "Relink Auth" : "Link Auth"}</button>`
+      : "";
+    const unlinkBtn = allowAuthLinking && linked
+      ? `<button class="btn danger" data-action="unlinkauth" data-id="${id}" title="Unlink auth account">Unlink Auth</button>`
+      : "";
+    const emailBtn = `<button class="btn" data-action="email" data-id="${id}">Email</button>`;
 
     if (normalized === "PENDING") {
-      if (!isAdmin()) return `<div class="actions">${linkBtn}</div>`;
+      if (!isAdmin()) return `<div class="actions">${emailBtn}${linkBtn}${unlinkBtn}</div>`;
       return `<div class="actions">
         <button class="btn success" data-action="activate"   data-id="${id}">Approve</button>
         <button class="btn danger"  data-action="reject"     data-id="${id}">Reject</button>
+        ${emailBtn}
         ${linkBtn}
+        ${unlinkBtn}
       </div>`;
     }
 
@@ -133,7 +155,7 @@
       const deactivateBtn = isSuperAdmin()
         ? `<button class="btn danger" data-action="deactivate" data-id="${id}">Deactivate</button>`
         : "";
-      return `<div class="actions">${suspendBtn}${deactivateBtn}${linkBtn}</div>`;
+      return `<div class="actions">${suspendBtn}${deactivateBtn}${emailBtn}${linkBtn}${unlinkBtn}</div>`;
     }
 
     if (normalized === "SUSPENDED") {
@@ -143,10 +165,85 @@
       const deactivateBtn = isSuperAdmin()
         ? `<button class="btn danger"  data-action="deactivate" data-id="${id}">Deactivate</button>`
         : "";
-      return `<div class="actions">${reactivateBtn}${deactivateBtn}${linkBtn}</div>`;
+      return `<div class="actions">${reactivateBtn}${deactivateBtn}${emailBtn}${linkBtn}${unlinkBtn}</div>`;
     }
 
-    return `<div class="actions">${linkBtn}</div>`;
+    return `<div class="actions">${emailBtn}${linkBtn}${unlinkBtn}</div>`;
+  }
+
+  async function openLinkAuthModal(teacherId) {
+    const row = state.teachers.find((t) => String(t.teacher_id) === String(teacherId));
+    if (!row) return;
+    state.linkTargetTeacherId = String(row.teacher_id);
+    $("linkTeacherIdInput").value = String(row.teacher_id || "");
+    $("linkTeacherEmailInput").value = String(row.email || "");
+    $("linkAuthUserIdInput").value = "";
+    $("allowRelinkInput").checked = false;
+    global.FSModal?.open?.($("linkAuthModal"));
+  }
+
+  async function submitLinkAuthModal() {
+    const teacherId = String(state.linkTargetTeacherId || "").trim();
+    const authUserId = String($("linkAuthUserIdInput")?.value || "").trim();
+    const allowRelink = $("allowRelinkInput")?.checked === true;
+    if (!teacherId) { notify("Teacher ID is missing.", "error"); return; }
+    if (!authUserId) { notify("Auth user id is required.", "error"); return; }
+    const btn = $("confirmLinkAuthBtn");
+    const prevLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Linking...";
+    try {
+      const rpcRes = await global.supabase.rpc("link_teacher_to_auth_user", {
+        p_teacher_id: teacherId,
+        p_auth_user_id: authUserId,
+        p_actor_email: state.profile?.email || null,
+        p_allow_relink: allowRelink,
+      });
+      const data = assertRpcOk(rpcRes, "Link request failed.");
+      notify(data?.previous_teacher_user_id ? "Teacher auth link updated safely." : "Teacher auth link created.", "success");
+      global.FSModal?.close?.($("linkAuthModal"));
+      await loadTeachers();
+    } catch (err) {
+      notify(FSAdminApi.normalizeError(err), "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel || "Link Auth User";
+    }
+  }
+
+  async function openUnlinkAuthModal(teacherId) {
+    const row = state.teachers.find((t) => String(t.teacher_id) === String(teacherId));
+    if (!row) return;
+    state.unlinkTargetTeacherId = String(row.teacher_id);
+    $("unlinkReasonInput").value = "";
+    $("unlinkAuthModalDesc").textContent = `Unlink auth user from ${row.full_name || "this teacher"} (${row.email || "no-email"})?`;
+    global.FSModal?.open?.($("unlinkAuthModal"));
+  }
+
+  async function submitUnlinkAuthModal() {
+    const teacherId = String(state.unlinkTargetTeacherId || "").trim();
+    const reason = String($("unlinkReasonInput")?.value || "").trim() || null;
+    if (!teacherId) { notify("Teacher ID is missing.", "error"); return; }
+    const btn = $("confirmUnlinkAuthBtn");
+    const prevLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Unlinking...";
+    try {
+      const rpcRes = await global.supabase.rpc("unlink_teacher_from_auth_user", {
+        p_teacher_id: teacherId,
+        p_actor_email: state.profile?.email || null,
+        p_reason: reason,
+      });
+      assertRpcOk(rpcRes, "Unlink request failed.");
+      notify("Teacher auth link removed.", "success");
+      global.FSModal?.close?.($("unlinkAuthModal"));
+      await loadTeachers();
+    } catch (err) {
+      notify(FSAdminApi.normalizeError(err), "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel || "Unlink";
+    }
   }
 
   // ── Filters + render ───────────────────────────────────────────────────────
@@ -377,18 +474,29 @@
 
   // ── Action dispatcher ──────────────────────────────────────────────────────
   async function handleLifecycleAction(action, teacherId, emailHint) {
-    if (action === "linkauth") {
+    if (action === "email") {
       const row = state.teachers.find((t) => String(t.teacher_id) === String(teacherId));
-      const teacherEmail = emailHint || row?.email || "";
-      if (!teacherEmail) { notify("No email on file for this teacher.", "error"); return; }
-      try {
-        const { error } = await global.supabase.rpc("link_teacher_to_auth_user", { teacher_email: teacherEmail });
-        if (error) throw error;
-        notify(`Auth account linked for ${teacherEmail}.`, "success");
-        await loadTeachers();
-      } catch (err) {
-        notify(FSAdminApi.normalizeError(err), "error");
+      if (!row?.email) { notify("No email on file for this teacher.", "error"); return; }
+      if (!global.FSDirectEmail?.open) { notify("Direct email modal is not available.", "error"); return; }
+      global.FSDirectEmail.open({ email: row.email, name: row.full_name || "" });
+      return;
+    }
+
+    if (action === "linkauth") {
+      if (!isAdmin()) {
+        notify("Only admins can manage auth linking.", "error");
+        return;
       }
+      await openLinkAuthModal(teacherId);
+      return;
+    }
+
+    if (action === "unlinkauth") {
+      if (!isAdmin()) {
+        notify("Only admins can manage auth linking.", "error");
+        return;
+      }
+      await openUnlinkAuthModal(teacherId);
       return;
     }
 
@@ -464,6 +572,13 @@
       if (!btn) return;
       handleLifecycleAction(btn.dataset.action, btn.dataset.id, btn.dataset.email);
     });
+
+    $("cancelLinkAuthBtn")?.addEventListener("click", () => global.FSModal?.close?.($("linkAuthModal")));
+    $("confirmLinkAuthBtn")?.addEventListener("click", submitLinkAuthModal);
+    $("cancelUnlinkAuthBtn")?.addEventListener("click", () => global.FSModal?.close?.($("unlinkAuthModal")));
+    $("confirmUnlinkAuthBtn")?.addEventListener("click", submitUnlinkAuthModal);
+    global.FSModal?.bindBackdropClose?.($("linkAuthModal"));
+    global.FSModal?.bindBackdropClose?.($("unlinkAuthModal"));
   }
 
   // ── Add Teacher modal (unchanged) ──────────────────────────────────────────
@@ -557,12 +672,16 @@
     if (!sessionRes?.data?.session) { global.location.href = "login.html"; return false; }
 
     const profile = await global.getCurrentProfile();
-    if (!profile || !isAdmin()) {
+    if (!profile) {
       setState("Access denied for this account.");
       return false;
     }
 
     state.profile = profile;
+    if (!isOperationalRole()) {
+      setState("Access denied for this account.");
+      return false;
+    }
     return true;
   }
 
@@ -572,6 +691,7 @@
       const { supabase, getCurrentProfile } = await import("../auth/auth-client.js");
       global.supabase          = supabase;
       global.getCurrentProfile = getCurrentProfile;
+      global.FSAdminShell?.mount({ active: "", pageTitle: "Teacher Management" });
 
       renderTabs();
       bindEvents();
@@ -579,6 +699,8 @@
 
       const allowed = await ensureAccess();
       if (!allowed) return;
+
+      global.FSDirectEmail?.init({ supabase, senderEmail: state.profile?.email || "" });
 
       await loadTeachers();
     } catch (error) {
@@ -588,4 +710,3 @@
 
   init();
 })(window);
-

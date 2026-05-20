@@ -54,6 +54,23 @@
     .ok { color: #166534; background: color-mix(in srgb, #22c55e 12%, var(--surface)); border-color: color-mix(in srgb, #22c55e 35%, var(--surface)); }
     .bad { color: #b42318; background: color-mix(in srgb, #ef4444 12%, var(--surface)); border-color: color-mix(in srgb, #ef4444 34%, var(--surface)); }
     .warn { color: #b45309; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); border-color: color-mix(in srgb, #f59e0b 35%, var(--surface)); }
+    .fs-modal-overlay {
+      position: fixed; inset: 0; background: rgba(14, 10, 28, 0.42);
+      display: none; align-items: center; justify-content: center; z-index: 120;
+      padding: 14px;
+    }
+    .fs-modal-overlay.open { display: flex; }
+    .fs-modal {
+      width: min(520px, 96vw);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow-soft);
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .fs-modal-title { margin: 0; font-size: 20px; }
     @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -103,6 +120,21 @@
       </div>
     </section>
   </main>
+  <div id="firstSessionModalOverlay" class="fs-modal-overlay" aria-hidden="true">
+    <div class="fs-modal">
+      <h2 class="fs-modal-title">First Class Session</h2>
+      <p class="meta">If you started late, confirm your actual start date so we don't flag earlier weeks as missing.</p>
+      <div class="field-wrap">
+        <label for="firstSessionNumber">Session number</label>
+        <input id="firstSessionNumber" type="number" min="1" step="1" value="1" />
+      </div>
+      <div class="field-wrap">
+        <label for="firstActualStartDate">Actual start date</label>
+        <input id="firstActualStartDate" type="date" />
+      </div>
+      <button id="confirmFirstSessionBtn" class="btn primary fs-btn fs-btn-primary">Confirm and Continue</button>
+    </div>
+  </div>
 
 <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
@@ -132,7 +164,9 @@ const state = {
   studentMilestones: [],
   roster: [],
   selectedClass: "",
-  search: ""
+  search: "",
+  firstSubmissionMeta: null,
+  firstSubmissionConfirmation: null
 };
 
 function setTheme() {
@@ -143,19 +177,52 @@ function setTheme() {
 }
 function flash(msg, type = "ok") { $("flash").innerHTML = msg ? `<div class="msg ${type}">${esc(msg)}</div>` : ""; }
 function todayYmd() { return new Date().toISOString().slice(0, 10); }
+function setFirstSessionModalOpen(open) {
+  const overlay = $("firstSessionModalOverlay");
+  if (!overlay) return;
+  overlay.classList.toggle("open", open);
+  overlay.setAttribute("aria-hidden", open ? "false" : "true");
+}
+function showFirstSessionModal(meta) {
+  state.firstSubmissionMeta = meta || null;
+  state.firstSubmissionConfirmation = null;
+  const defaultDate = todayYmd();
+  const minDate = String(meta?.batchStartDate || "").trim();
+  $("firstSessionNumber").value = "1";
+  $("firstActualStartDate").value = defaultDate;
+  $("firstActualStartDate").min = minDate || "";
+  setFirstSessionModalOpen(true);
+}
+
+async function invokeTeacherPortalAction(action, params = {}) {
+  const { data: sessionWrap } = await supabase.auth.getSession();
+  const token = sessionWrap?.session?.access_token || "";
+  const res = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/teacher-portal-api`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": CONFIG.SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action, params }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.ok) throw new Error(json?.error || `teacher-portal-api failed (${res.status})`);
+  return json;
+}
 
 function milestoneIdFor(name) {
   const found = state.milestoneDefs.find((m) => String(m.name || m.question || "").toLowerCase() === name.toLowerCase());
-  return found?.id || found?.milestone_id || name;
+  return found?.code || found?.id || found?.milestone_id || name;
 }
 
 function renderClassOptions() {
   const rows = state.assignments.map((a) => {
-    const classId = a.class_option_id || a.class_id;
+    const classId = a.class_option_id || a.class_id || a.classOptionId;
     const cls = state.classes.find((c) => String(c.class_option_id || c.class_id || "") === String(classId || ""));
     return {
       value: classId,
-      label: `${classId || "-"} · ${cls?.day || "-"} ${cls?.class_time || cls?.time_slot || ""} · ${cls?.teacher_name || cls?.teacher_id || "-"}`
+      label: `${classId || "-"} · ${a.day || cls?.day || "-"} ${a.time || cls?.class_time || cls?.time_slot || ""} · ${a.teacher_name || cls?.teacher_name || cls?.teacher_id || "-"}`
     };
   }).filter((x) => x.value);
   $("classSelect").innerHTML = rows.map((r) => `<option value="${esc(r.value)}">${esc(r.label)}</option>`).join("") || `<option value="">No assigned classes</option>`;
@@ -167,7 +234,7 @@ function hydrateRoster() {
   const all = state.applicants.filter((a) => String(a.class_option_id || "") === String(state.selectedClass || ""));
   state.roster = all.map((a) => {
     const sm = state.studentMilestones.filter((m) => String(m.applicant_id || m.student_id || "") === String(a.id || ""));
-    const milestoneOn = new Set(sm.filter((m) => m.status === "completed" || m.completed === true || String(m.value || "").toLowerCase() === "yes").map((m) => String(m.milestone_name || m.name || m.milestone_id || "")));
+    const milestoneOn = new Set(sm.filter((m) => m.status === "completed" || m.completed === true || String(m.value || "").toLowerCase() === "yes").map((m) => String(m.milestone_code || m.milestone_name || m.name || m.milestone_id || "")));
     return {
       id: a.id,
       full_name: a.full_name || "Student",
@@ -229,16 +296,15 @@ function renderRoster() {
 async function loadData() {
   const profile = state.auth.profile;
   const teacherId = profile.user_id;
-  const teacherEmail = profile.email;
-  const [{ data: assignments, error: aErr }, { data: classes, error: cErr }, { data: applicants, error: pErr }, { data: mDefs }, { data: sMiles }] = await Promise.all([
-    supabase.from("teacher_assignments").select("*").or(`teacher_email.eq.${teacherEmail},teacher_id.eq.${teacherId}`).limit(500),
+  const [{ data: classes, error: cErr }, { data: applicants, error: pErr }, { data: mDefs }, { data: sMiles }] = await Promise.all([
     supabase.from("class_options").select("*").limit(1000),
     supabase.from("applicants").select("*").limit(5000),
     supabase.from("milestone_definitions").select("*").limit(200),
-    supabase.from("student_milestones").select("*").limit(10000)
+    supabase.from("student_milestone_status").select("*").limit(10000)
   ]);
-  if (aErr || cErr || pErr) throw new Error(aErr?.message || cErr?.message || pErr?.message);
-  state.assignments = assignments || [];
+  const assignmentsResponse = await invokeTeacherPortalAction("getTeacherActiveClassOptions", { teacherId });
+  state.assignments = assignmentsResponse?.data || [];
+  if (cErr || pErr) throw new Error(cErr?.message || pErr?.message);
   state.classes = classes || [];
   state.applicants = applicants || [];
   state.milestoneDefs = mDefs || [];
@@ -248,8 +314,26 @@ async function loadData() {
   renderRoster();
 }
 
+async function maybePromptFirstSubmissionMeta() {
+  state.firstSubmissionMeta = null;
+  state.firstSubmissionConfirmation = null;
+  if (!state.selectedClass) return;
+  try {
+    const r = await invokeTeacherPortalAction("loadAttendanceRoster", { classOptionId: state.selectedClass });
+    const meta = r?.data?.firstSubmissionMeta;
+    if (meta) showFirstSessionModal(meta);
+  } catch (_) {
+    // Non-blocking: attendance form remains usable if metadata check fails.
+  }
+}
+
 async function saveAttendance() {
   if (!state.selectedClass) { flash("Please select a class.", "warn"); return; }
+  if (state.firstSubmissionMeta && !state.firstSubmissionConfirmation) {
+    flash("Please confirm first class session details before submitting.", "warn");
+    setFirstSessionModalOpen(true);
+    return;
+  }
   const now = new Date().toISOString();
   const classDate = $("classDate").value || todayYmd();
   const session = $("sessionSelect").value;
@@ -277,16 +361,16 @@ async function saveAttendance() {
       upserts.push({
         applicant_id: s.id,
         student_id: s.id,
-        milestone_id: milestoneIdFor(m),
-        milestone_name: m,
+        milestone_code: milestoneIdFor(m),
         status: on ? "completed" : "pending",
-        completed: on,
+        completed_at: on ? now : null,
+        completed_by: on ? state.auth.profile.email : null,
         updated_at: now,
         updated_by: state.auth.profile.email
       });
     });
   });
-  const { error: mErr } = await supabase.from("student_milestones").upsert(upserts, { onConflict: "applicant_id,milestone_id" });
+  const { error: mErr } = await supabase.from("student_milestone_status").upsert(upserts, { onConflict: "applicant_id,milestone_code" });
   if (mErr) { flash(`Milestone update issue: ${mErr.message}`, "warn"); }
 
   await supabase.from("audit_logs").insert({
@@ -299,7 +383,8 @@ async function saveAttendance() {
       class_option_id: state.selectedClass,
       class_date: classDate,
       session,
-      roster_count: state.roster.length
+      roster_count: state.roster.length,
+      first_submission_meta: state.firstSubmissionConfirmation || null
     },
     created_at: now
   });
@@ -314,10 +399,30 @@ function wire() {
     state.selectedClass = $("classSelect").value;
     hydrateRoster();
     renderRoster();
+    maybePromptFirstSubmissionMeta();
   });
   $("searchInput").addEventListener("input", (e) => {
     state.search = e.target.value || "";
     renderRoster();
+  });
+  $("confirmFirstSessionBtn").addEventListener("click", () => {
+    const sessionNumber = Number($("firstSessionNumber").value || 1);
+    const actualStartDate = String($("firstActualStartDate").value || "").trim();
+    const minDate = String(state.firstSubmissionMeta?.batchStartDate || "").trim();
+    if (!Number.isInteger(sessionNumber) || sessionNumber < 1) {
+      flash("Session number must be 1 or greater.", "warn");
+      return;
+    }
+    if (!actualStartDate) {
+      flash("Actual start date is required.", "warn");
+      return;
+    }
+    if (minDate && actualStartDate < minDate) {
+      flash(`Actual start date cannot be before batch start (${minDate}).`, "warn");
+      return;
+    }
+    state.firstSubmissionConfirmation = { actualStartDate, sessionNumber };
+    setFirstSessionModalOpen(false);
   });
   $("saveBtn").addEventListener("click", saveAttendance);
 }
@@ -333,12 +438,11 @@ async function boot() {
   state.auth = auth;
   await loadData();
   wire();
+  await maybePromptFirstSubmissionMeta();
 }
 
 boot().catch((e) => flash(`Failed to load attendance module: ${e.message || e}`, "bad"));
 </script>
 </body>
 </html>
-
-
 

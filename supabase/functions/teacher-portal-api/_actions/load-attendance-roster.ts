@@ -42,6 +42,44 @@ export async function loadAttendanceRosterAction(ctx: ActionContext): Promise<Re
         })
         .filter(Boolean);
 
+      const attendanceCountRes = await withTimeout(
+        db
+          .from("attendance_log")
+          .select("attendance_id", { count: "exact", head: true })
+          .eq("class_option_id", classOptionId),
+        "detect first attendance submission",
+      );
+      if (attendanceCountRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to detect class submission history", 500);
+      const isFirstSubmission = Number(attendanceCountRes.count || 0) === 0;
+
+      const classMetaRes = await withTimeout(
+        db
+          .from("class_options")
+          .select("class_option_id,confirmed_start_date")
+          .eq("class_option_id", classOptionId)
+          .maybeSingle(),
+        "load class metadata for first submission",
+      );
+      if (classMetaRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to load class metadata", 500);
+
+      const slotRes = await withTimeout(
+        db
+          .from("class_slots")
+          .select("batch_id,status,batches(batch_id,start_date,active,status)")
+          .eq("class_option_id", classOptionId)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        "load class slot batch metadata",
+      );
+      if (slotRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to load class slot metadata", 500);
+      const activeSlot = (slotRes.data || []).find((row: any) => {
+        const batch = Array.isArray(row.batches) ? row.batches[0] : row.batches;
+        const batchActive = batch?.active === true || String(batch?.status || "").toUpperCase() === "ACTIVE";
+        const slotActive = String(row.status || "").toUpperCase() === "ACTIVE" || !row.status;
+        return batchActive && slotActive && String(batch?.start_date || "").trim();
+      });
+      const activeBatch = activeSlot ? (Array.isArray(activeSlot.batches) ? activeSlot.batches[0] : activeSlot.batches) : null;
+
       const { data: fellowships } = await withTimeout(
         db.from("fellowship_map").select("fellowship_code,campus_name").eq("active", true).order("campus_name"),
         "fetch fellowships",
@@ -54,6 +92,13 @@ export async function loadAttendanceRosterAction(ctx: ActionContext): Promise<Re
           fellowships: (fellowships || []).map((f) => ({ code: f.fellowship_code, name: f.campus_name })),
           alreadySubmitted: false,
           previousSubmissionSummary: "",
+          firstSubmissionRequired: isFirstSubmission,
+          firstSubmissionMeta: {
+            classOptionId,
+            confirmedStartDate: classMetaRes.data?.confirmed_start_date || null,
+            batchId: activeBatch?.batch_id || null,
+            batchStartDate: activeBatch?.start_date || null,
+          },
         },
       });
     }

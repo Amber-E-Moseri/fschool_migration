@@ -1,4 +1,4 @@
-ï»¿<!doctype html>
+<!doctype html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -107,7 +107,7 @@
       <p id="actionReasonDesc" style="margin:0;color:var(--color-text-secondary,var(--muted));font-size:14px;"></p>
       <div class="tm-field tm-field-full" style="margin-top:12px;">
         <label class="tm-label" for="actionReasonInput">Reason <span id="actionReasonRequired" style="color:var(--color-danger-fg,#b53030);">*</span></label>
-        <textarea id="actionReasonInput" class="fs-input" rows="3" placeholder="Enter reasonâ€¦" style="resize:vertical;"></textarea>
+        <textarea id="actionReasonInput" class="fs-input" rows="3" placeholder="Enter reason…" style="resize:vertical;"></textarea>
         <p id="actionReasonError" class="tm-note" style="color:var(--color-danger-fg,#b53030);min-height:18px;margin-top:4px;"></p>
       </div>
       <div class="tm-modal-actions">
@@ -161,7 +161,7 @@
           <p class="tm-note">Email: <span id="addTeacherResultEmail"></span></p>
           <pre id="addTeacherResultPassword"></pre>
           <p class="tm-note">Login URL: <code>/foundation/auth/login.html</code></p>
-          <p class="tm-note">Status is PENDING â€” use Activate to enable portal access</p>
+          <p class="tm-note">Status is PENDING — use Activate to enable portal access</p>
         </div>
         <div class="tm-modal-actions tm-field-full">
           <button id="cancelAddTeacherBtn" type="button" class="btn fs-btn fs-btn-secondary">Cancel</button>
@@ -171,19 +171,64 @@
     </div>
   </div>
 
-  <script src="../js/config.js"></script>
+  
+  <div id="linkAuthModal" class="tm-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="linkAuthModalTitle">
+    <div class="tm-modal" style="max-width:560px;">
+      <h2 id="linkAuthModalTitle">Link Teacher to Auth User</h2>
+      <p class="tm-note">Select the exact teacher record and enter the exact auth user id. Email-only linking is disabled.</p>
+      <div class="tm-modal-grid">
+        <div class="tm-field">
+          <label class="tm-label" for="linkTeacherIdInput">Teacher ID</label>
+          <input id="linkTeacherIdInput" class="fs-input" type="text" readonly />
+        </div>
+        <div class="tm-field">
+          <label class="tm-label" for="linkTeacherEmailInput">Teacher Email</label>
+          <input id="linkTeacherEmailInput" class="fs-input" type="text" readonly />
+        </div>
+        <div class="tm-field tm-field-full">
+          <label class="tm-label" for="linkAuthUserIdInput">Auth User ID (UUID)</label>
+          <input id="linkAuthUserIdInput" class="fs-input" type="text" placeholder="Exact auth.users.id" />
+        </div>
+        <label class="tm-field tm-field-full" style="grid-template-columns:auto 1fr;align-items:center;display:grid;">
+          <input id="allowRelinkInput" type="checkbox" />
+          <span class="tm-note">Allow relink (required if this teacher is already linked)</span>
+        </label>
+      </div>
+      <div class="tm-modal-actions">
+        <button id="cancelLinkAuthBtn" type="button" class="btn fs-btn fs-btn-secondary">Cancel</button>
+        <button id="confirmLinkAuthBtn" type="button" class="btn fs-btn fs-btn-primary">Link Auth User</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="unlinkAuthModal" class="tm-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="unlinkAuthModalTitle">
+    <div class="tm-modal" style="max-width:480px;">
+      <h2 id="unlinkAuthModalTitle">Unlink Teacher Auth</h2>
+      <p id="unlinkAuthModalDesc" class="tm-note">Confirm unlink.</p>
+      <div class="tm-field tm-field-full">
+        <label class="tm-label" for="unlinkReasonInput">Reason (optional)</label>
+        <textarea id="unlinkReasonInput" class="fs-input" rows="3" placeholder="Reason for unlink"></textarea>
+      </div>
+      <div class="tm-modal-actions">
+        <button id="cancelUnlinkAuthBtn" type="button" class="btn fs-btn fs-btn-secondary">Cancel</button>
+        <button id="confirmUnlinkAuthBtn" type="button" class="btn fs-btn fs-btn-danger">Unlink</button>
+      </div>
+    </div>
+  </div>`r`n  <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
-  <script src="../js/admin-shell.js"></script>
   <script src="../js/admin-ui.js"></script>
-  <script src="../js/admin-api.js"></script>
-  <script src="../js/modal.js"></script>
   <script src="../js/toast.js"></script>
+  <script src="../js/admin-api.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
+  <script src="../js/modal.js"></script>
   <script src="../js/api-client.js"></script>
+<script src="../js/direct-email-modal.js"></script>
   <script src="../js/teacher-management.js"></script>
-  <script>
-    window.FSAdminShell && window.FSAdminShell.mount({ active: "", pageTitle: "Teacher Management" });
-  </script>
 </body>
 </html>
+
+
+
+
 
 

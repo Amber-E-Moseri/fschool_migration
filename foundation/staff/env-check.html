@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Solid - Environment Check</title>
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
+</head>
+<body>
+  <main class="fs-content">
+    <div class="fs-page-header">
+      <div>
+        <h1 class="fs-page-title">Environment Check</h1>
+        <p class="fs-page-subtitle">Quick deploy validation for runtime config and edge readiness.</p>
+      </div>
+      <div class="fs-page-actions">
+        <button id="refreshBtn" class="fs-btn fs-btn-secondary" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <section class="fs-card" style="margin-bottom:16px;">
+      <div class="fs-card-header">
+        <h2 class="fs-card-title">Runtime</h2>
+      </div>
+      <div id="envState" class="fs-banner fs-banner-info">Loading checks...</div>
+      <div class="fs-table-wrap" style="margin-top:12px;">
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Status</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="runtimeRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="fs-card">
+      <div class="fs-card-header">
+        <h2 class="fs-card-title">Edge Functions</h2>
+      </div>
+      <div class="fs-table-wrap">
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Status</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="edgeRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
+  <script src="../js/admin-ui.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/admin-api.js"></script>
+  <script src="../js/admin-shell.js?v=20260519"></script>
+  <script type="module">
+    import { supabase, requireAuth } from "../auth/auth-client.js";
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+    const edgeFunctions = ["retry-worker", "registration-processor", "moodle-sync", "notification-batch-processor", "notification-dispatcher", "mailchimp-sync"];
+
+    function badge(state) {
+      if (state === "PASS") return `<span class="fs-badge fs-badge-success">PASS</span>`;
+      if (state === "WARN") return `<span class="fs-badge fs-badge-warning">WARN</span>`;
+      return `<span class="fs-badge fs-badge-danger">FAIL</span>`;
+    }
+
+    function envName() {
+      const host = window.location.hostname || "";
+      if (host.includes("localhost") || host === "127.0.0.1") return "localhost";
+      if (host.endsWith(".netlify.app")) return "netlify.app";
+      return "custom-domain";
+    }
+
+    async function checkSupabase() {
+      try {
+        const { error } = await supabase.from("batches").select("batch_id", { head: true, count: "exact" }).limit(1);
+        if (error) return { state: "FAIL", detail: error.message };
+        return { state: "PASS", detail: "Database reachable." };
+      } catch (e) {
+        return { state: "FAIL", detail: String(e?.message || e) };
+      }
+    }
+
+    async function checkSenderHealth() {
+      try {
+        const url = String(window.FS_CONFIG?.SUPABASE_URL || "").trim();
+        const anon = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || "").trim();
+        if (!url || !anon) return { state: "FAIL", detail: "Missing runtime config." };
+        const res = await fetch(`${url}/functions/v1/sender-healthcheck`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: anon,
+            Authorization: `Bearer ${anon}`,
+          },
+          body: JSON.stringify({ ping: true }),
+        });
+        if (!res.ok) return { state: "WARN", detail: `Function reachable but returned HTTP ${res.status}.` };
+        const data = await res.json().catch(() => ({}));
+        const configured = Boolean(data?.resend_configured ?? data?.configured ?? data?.ok);
+        return configured
+          ? { state: "PASS", detail: "RESEND configured." }
+          : { state: "WARN", detail: "sender-healthcheck responded but RESEND not confirmed." };
+      } catch (e) {
+        return { state: "FAIL", detail: String(e?.message || e) };
+      }
+    }
+
+    async function checkEdge(name) {
+      const url = String(window.FS_CONFIG?.SUPABASE_URL || "").trim();
+      const anon = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || "").trim();
+      if (!url || !anon) return { state: "FAIL", detail: "Missing runtime config." };
+      try {
+        const res = await fetch(`${url}/functions/v1/${name}`, {
+          method: "OPTIONS",
+          headers: {
+            apikey: anon,
+            Authorization: `Bearer ${anon}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (res.ok) return { state: "PASS", detail: `Reachable (HTTP ${res.status})` };
+        if (res.status === 401 || res.status === 403) return { state: "WARN", detail: `Reachable, auth restricted (HTTP ${res.status})` };
+        return { state: "WARN", detail: `Responded HTTP ${res.status}` };
+      } catch (e) {
+        return { state: "FAIL", detail: String(e?.message || e) };
+      }
+    }
+
+    async function render() {
+      $("envState").textContent = "Running checks...";
+      const supabaseResult = await checkSupabase();
+      const senderResult = await checkSenderHealth();
+      const moodleConfigured = Boolean(String(window.FS_CONFIG?.MOODLE_URL || "").trim());
+      const runtimeRows = [
+        { key: "Current Environment", state: "PASS", detail: `${envName()} (${window.location.origin})` },
+        { key: "Supabase Connection", ...supabaseResult },
+        { key: "MOODLE_URL configured", state: moodleConfigured ? "PASS" : "WARN", detail: moodleConfigured ? "Yes" : "No" },
+        { key: "RESEND configured", ...senderResult },
+      ];
+      $("runtimeRows").innerHTML = runtimeRows.map((r) => `
+        <tr>
+          <td>${esc(r.key)}</td>
+          <td>${badge(r.state)}</td>
+          <td>${esc(r.detail)}</td>
+        </tr>
+      `).join("");
+
+      const edgeStatuses = await Promise.all(edgeFunctions.map(async (fn) => ({ fn, ...(await checkEdge(fn)) })));
+      $("edgeRows").innerHTML = edgeStatuses.map((r) => `
+        <tr>
+          <td>${esc(r.fn)}</td>
+          <td>${badge(r.state)}</td>
+          <td>${esc(r.detail)}</td>
+        </tr>
+      `).join("");
+      $("envState").textContent = "Checks complete.";
+      $("envState").className = "fs-banner fs-banner-success";
+    }
+
+    async function boot() {
+      if (!window.FS_CONFIG?.SUPABASE_URL) {
+        $("envState").textContent = "Not connected: missing FS_CONFIG.SUPABASE_URL";
+        $("envState").className = "fs-banner fs-banner-danger";
+        return;
+      }
+      const auth = await requireAuth(["admin", "superadmin"]);
+      if (!auth) return;
+      window.FSAdminShell?.mount({ active: "health", pageTitle: "Environment Check", role: auth.profile?.role || "" });
+      $("refreshBtn").addEventListener("click", render);
+      await render();
+    }
+
+    boot().catch((e) => {
+      $("envState").textContent = `Failed to initialize: ${String(e?.message || e)}`;
+      $("envState").className = "fs-banner fs-banner-danger";
+    });
+  </script>
+</body>
+</html>

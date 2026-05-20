@@ -1,0 +1,177 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Choose Your Class Time | Rock Solid</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <style>
+    :root { --brand-purple: #4C2A92; --brand-red: #C8102E; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Manrope", sans-serif; background: #f4f2fb; color: #1a1a1f; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 40px; }
+    .hero { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+    .hero img { height: 56px; width: auto; }
+    .hero h1 { margin: 0; font-size: 28px; color: var(--brand-purple); }
+    .sub { margin: 0 0 14px; color: #4a4a54; }
+    .badge { display: inline-block; background: #ede6fd; color: var(--brand-purple); border: 1px solid #ddcffb; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .msg { margin-top: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid #d8d8df; background: #fff; }
+    .msg.error { border-color: #f2b7b7; color: #7d1d1d; background: #fff5f5; }
+    .msg.success { border-color: #9edeb7; color: #165935; background: #effcf4; }
+    .grid { margin-top: 16px; display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #e4dfef; border-radius: 14px; padding: 16px; box-shadow: 0 2px 10px rgba(30, 18, 64, 0.06); }
+    .card.selected { border-color: var(--brand-purple); box-shadow: 0 0 0 2px rgba(76, 42, 146, 0.16); }
+    .slot { font-size: 22px; font-weight: 800; color: var(--brand-purple); margin: 0 0 6px; }
+    .meta { margin: 2px 0; color: #4d4d59; font-size: 14px; }
+    .spots { margin-top: 8px; color: var(--brand-red); font-weight: 700; font-size: 13px; }
+    .btn { margin-top: 12px; width: 100%; border: 0; border-radius: 10px; background: var(--brand-purple); color: #fff; padding: 12px 14px; font-weight: 700; cursor: pointer; }
+    .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+    .skeleton { height: 115px; background: linear-gradient(90deg, #f1eef8, #f8f7fc, #f1eef8); border-radius: 14px; animation: pulse 1.2s infinite; border: 1px solid #ece7f8; }
+    @keyframes pulse { 0%{opacity:.65} 50%{opacity:1} 100%{opacity:.65} }
+    @media (min-width: 860px) { .grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <img src="./canada_sr.png" alt="BLW Canada" />
+      <div>
+        <h1>Choose Your Class Time</h1>
+        <p class="sub" id="subheading">Loading your available class options...</p>
+      </div>
+    </header>
+
+    <div id="fellowshipBadge"></div>
+    <div id="alert"></div>
+    <section class="grid" id="classGrid"></section>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script>
+    const API = window.FS_CONFIG?.SUPABASE_URL ? `${window.FS_CONFIG.SUPABASE_URL}/functions/v1/class-selection` : null;
+    const token = new URLSearchParams(window.location.search).get('token');
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+    function setMessage(msg, type = '') {
+      $('alert').innerHTML = msg ? `<div class="msg ${type}">${msg}</div>` : '';
+    }
+
+    async function callApi(payload) {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return res.json();
+    }
+
+    function renderSkeleton() {
+      $('classGrid').innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+    }
+
+    async function loadOptions() {
+      if (!API) {
+        setMessage('This page is not configured correctly. Please contact support.', 'error');
+        return;
+      }
+      if (!token) {
+        setMessage('This link is invalid. Please contact support.', 'error');
+        return;
+      }
+
+      renderSkeleton();
+      const res = await callApi({ action: 'get_options', token });
+
+      if (!res?.ok) {
+        $('classGrid').innerHTML = '';
+        if (res?.code === 'TOKEN_EXPIRED') {
+          setMessage('This link has expired. Please contact foundation@lwcanada.org to request a new one.', 'error');
+          return;
+        }
+        if (res?.code === 'TOKEN_USED') {
+          setMessage('You have already selected a class. Check your email for your confirmation.', 'success');
+          return;
+        }
+        setMessage(res?.error || 'This link is invalid. Please contact support.', 'error');
+        return;
+      }
+
+      const applicant = res.applicant || {};
+      $('subheading').textContent = `Hi ${applicant.first_name || 'Student'}, please select your preferred class time below.`;
+      $('fellowshipBadge').innerHTML = `<span class="badge">Fellowship: ${esc(applicant.fellowship_code || 'REGIONAL')}</span>`;
+
+      const classes = Array.isArray(res.classes) ? res.classes : [];
+      if (!classes.length) {
+        $('classGrid').innerHTML = '';
+        setMessage('No class options are currently available for your fellowship. Please check back soon.', 'error');
+        return;
+      }
+
+      setMessage('');
+      $('classGrid').innerHTML = classes.map((c) => {
+        const spots = (typeof c.available_spots === 'number' && c.available_spots < 5)
+          ? `<div class="spots">${c.available_spots} spots remaining</div>`
+          : '';
+        return `<article class="card" data-class-id="${esc(c.class_option_id)}">
+          <p class="slot">${esc(c.day || '')} ${esc(c.class_time || '')}</p>
+          <p class="meta">Teacher: ${esc(c.teacher_name || 'TBA')}</p>
+          <p class="meta">Campus: ${esc((c.fellowship_codes || []).join(', ') || 'REGIONAL')}</p>
+          ${spots}
+          <button class="btn" data-select="${esc(c.class_option_id)}">Select This Class</button>
+        </article>`;
+      }).join('');
+
+      bindSelect();
+    }
+
+    function setDisabled(disabled) {
+      document.querySelectorAll('[data-select]').forEach((btn) => {
+        btn.disabled = disabled;
+      });
+    }
+
+    function bindSelect() {
+      $('classGrid').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-select]');
+        if (!btn) return;
+        const classId = btn.getAttribute('data-select');
+        if (!classId) return;
+
+        setDisabled(true);
+        document.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
+        const card = btn.closest('.card');
+        if (card) card.classList.add('selected');
+
+        const orig = btn.textContent;
+        btn.textContent = 'Confirming...';
+
+        try {
+          const res = await callApi({ action: 'select_class', token, class_option_id: classId });
+          if (!res?.ok) {
+            setMessage(res?.error || 'Could not confirm your class. Please try another option.', 'error');
+            setDisabled(false);
+            btn.textContent = orig;
+            return;
+          }
+
+          $('classGrid').innerHTML = '';
+          const klass = res.class || {};
+          setMessage(`? You're in! Your class has been confirmed.<br>Teacher: ${esc(klass.teacher_name || '')}<br>Time: ${esc(klass.day || '')} at ${esc(klass.class_time || '')}<br>You will receive a confirmation email shortly with your Moodle login details. See you in class!`, 'success');
+        } catch (err) {
+          setMessage('Network error while confirming your class. Please try again.', 'error');
+          setDisabled(false);
+          btn.textContent = orig;
+        }
+      });
+    }
+
+    loadOptions();
+  </script>
+</body>
+</html>
+

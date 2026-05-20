@@ -8,26 +8,18 @@ import { safeLogAudit, writeAudit } from "../_lib/teacher-auth.ts";
 export async function lookupTeacherForAttendanceAction(ctx: ActionContext): Promise<Response> {
   const { db, auth, params } = ctx;
   const query = safeLower(params.query);
+  const role = safeLower(auth.role);
+  const isAdmin = role === "admin" || role === "superadmin" || role === "subgroup_admin" || role === "pastor" || role === "principal";
   const teacher = auth.teacher;
   const hay = `${safeLower(teacher.fullName)} ${safeLower(teacher.email)} ${safeLower(teacher.teacherId)}`;
   const matchesSelf = !query || hay.includes(query);
-  if (matchesSelf) {
+  if (matchesSelf && !isAdmin) {
     return json({
       ok: true,
       data: [{ teacherId: teacher.teacherId, fullName: teacher.fullName, email: teacher.email, subGroupLabel: "" }],
     });
   }
 
-  const profileRes = await withTimeout(
-    db
-      .from("profiles")
-      .select("role")
-      .eq("user_id", auth.user.id)
-      .maybeSingle(),
-    "lookup caller role",
-  );
-  const role = safeLower(profileRes.data?.role);
-  const isAdmin = role === "admin" || role === "superadmin";
   if (!isAdmin) {
     return json({ ok: true, data: [] });
   }

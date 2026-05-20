@@ -58,6 +58,7 @@
       <h1 class="fs-page-title">Waitlist Management</h1>
       <div class="fs-page-actions">
         <select class="fs-select" id="batchFilter" style="min-width:160px"><option value="">All Batches</option></select>
+        <button id="notifyWaitlistedBtn" class="fs-btn fs-btn-secondary" style="display:none">Notify Waitlisted Students</button>
         <button id="runCheckBtn" class="fs-btn fs-btn-primary">Run Waitlist Check</button>
         <button id="refreshBtn" class="fs-btn fs-btn-secondary">Refresh</button>
       </div>
@@ -147,17 +148,43 @@
         <div id="ovMsg" style="margin-top:var(--space-2)"></div>
       </div>
     </div>
+
+    <div id="notifyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;align-items:center;justify-content:center;padding:16px">
+      <div style="width:min(640px,100%);background:#fff;border:1px solid var(--color-border);border-radius:12px;padding:16px">
+        <h3 style="margin:0 0 12px">Notify Waitlisted Students</h3>
+        <div class="form-row" style="grid-template-columns:1fr 1fr">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:var(--color-text-muted);display:block;margin-bottom:4px">Fellowship Codes (comma-separated)</label>
+            <input class="fs-input" id="notifyFellowships" type="text" placeholder="REGIONAL,DAL" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:var(--color-text-muted);display:block;margin-bottom:4px">Batch</label>
+            <select class="fs-select" id="notifyBatch"></select>
+          </div>
+        </div>
+        <p id="notifyPreview" style="margin:8px 0 14px;color:var(--color-text-muted);font-size:13px">Will notify 0 students</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="notifyCancelBtn" class="fs-btn fs-btn-secondary">Cancel</button>
+          <button id="notifySendBtn" class="fs-btn fs-btn-primary">Send Notifications</button>
+        </div>
+        <div id="notifyMsg" style="margin-top:10px"></div>
+      </div>
+    </div>
   </main>
 
   <script src="../js/config.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, requireAuth, getCurrentProfile } from "../auth/auth-client.js";
 
     const WAITLIST_FN = window.FS_CONFIG?.SUPABASE_URL
       ? `${window.FS_CONFIG.SUPABASE_URL}/functions/v1/waitlist-processor`
       : null;
+    const CLASS_SELECTION_FN = window.FS_CONFIG?.SUPABASE_URL
+      ? `${window.FS_CONFIG.SUPABASE_URL}/functions/v1/class-selection`
+      : null;
     const SERVICE_KEY = window.FS_CONFIG?.SUPABASE_ANON_KEY || "";
+    const SERVICE_ROLE_KEY = window.FS_CONFIG?.SUPABASE_SERVICE_ROLE_KEY || "";
 
     const $ = (id) => document.getElementById(id);
     const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[m]));
@@ -421,6 +448,30 @@
       return res.json().catch(() => null);
     }
 
+    function parseCodes(raw) {
+      return String(raw || "")
+        .split(",")
+        .map((v) => v.trim().toUpperCase())
+        .filter(Boolean);
+    }
+
+    async function loadNotifyPreview() {
+      const codes = parseCodes($("notifyFellowships").value);
+      const batchId = $("notifyBatch").value;
+      if (!codes.length || !batchId) {
+        $("notifyPreview").textContent = "Will notify 0 students";
+        return;
+      }
+      const { count } = await supabase
+        .from("applicants")
+        .select("id", { head: true, count: "exact" })
+        .eq("registration_status", "WAITLISTED")
+        .in("fellowship_code", codes)
+        .eq("batch_id", batchId)
+        .is("class_option_id", null);
+      $("notifyPreview").textContent = `Will notify ${count || 0} students`;
+    }
+
     // ── Event wiring ──────────────────────────────────────────────────────────
     function bindEvents() {
       $("refreshBtn").addEventListener("click", loadData);
@@ -452,6 +503,79 @@
           showFlash(`Check failed: ${result?.error || "unknown error"}`, "error");
         }
       });
+
+      if (state.isSuperadmin) {
+        const modal = $("notifyModal");
+        const notifyBtn = $("notifyWaitlistedBtn");
+        notifyBtn.style.display = "";
+
+        notifyBtn.addEventListener("click", async () => {
+          $("notifyMsg").innerHTML = "";
+          $("notifyBatch").innerHTML = state.batches
+            .map((b) => `<option value="${esc(b.batch_id)}">${esc(b.batch_name || b.batch_id)}</option>`)
+            .join("");
+          const waitlistedCodes = new Set();
+          for (const key of Object.keys(state.waitlistCounts)) {
+            const [coId] = key.split(":");
+            const co = state.classOptions[coId];
+            for (const c of co?.fellowship_codes || []) waitlistedCodes.add(String(c || "").toUpperCase());
+          }
+          $("notifyFellowships").value = [...waitlistedCodes].join(",");
+          await loadNotifyPreview();
+          modal.style.display = "flex";
+        });
+
+        $("notifyCancelBtn").addEventListener("click", () => {
+          modal.style.display = "none";
+        });
+
+        $("notifyFellowships").addEventListener("input", () => { loadNotifyPreview(); });
+        $("notifyBatch").addEventListener("change", () => { loadNotifyPreview(); });
+
+        $("notifySendBtn").addEventListener("click", async () => {
+          const codes = parseCodes($("notifyFellowships").value);
+          const batchId = $("notifyBatch").value;
+          if (!codes.length || !batchId) {
+            $("notifyMsg").innerHTML = '<div class="msg error">Provide fellowship codes and batch.</div>';
+            return;
+          }
+          if (!CLASS_SELECTION_FN) {
+            $("notifyMsg").innerHTML = '<div class="msg error">Class-selection endpoint is unavailable.</div>';
+            return;
+          }
+          if (!SERVICE_ROLE_KEY) {
+            $("notifyMsg").innerHTML = '<div class="msg error">Missing SUPABASE_SERVICE_ROLE_KEY in FS_CONFIG.</div>';
+            return;
+          }
+          $("notifySendBtn").disabled = true;
+          $("notifyMsg").innerHTML = '<div class="msg">Sending notifications...</div>';
+          try {
+            const res = await fetch(CLASS_SELECTION_FN, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
+                "apikey": SERVICE_ROLE_KEY,
+              },
+              body: JSON.stringify({
+                action: "notify_waitlisted",
+                fellowship_codes: codes,
+                batch_id: batchId,
+              }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.ok) {
+              throw new Error(data?.error || `HTTP ${res.status}`);
+            }
+            $("notifyMsg").innerHTML = `<div class="msg success">${data.notified || 0} students notified, ${data.emails_queued || 0} emails queued.</div>`;
+            await loadData();
+          } catch (err) {
+            $("notifyMsg").innerHTML = `<div class="msg error">Notification send failed: ${esc(err?.message || err)}</div>`;
+          } finally {
+            $("notifySendBtn").disabled = false;
+          }
+        });
+      }
 
       // Queue table — expand, promote, capacity edit
       $("queueTableBody").addEventListener("click", async (e) => {
@@ -595,7 +719,7 @@
             recipient_email: ap.email,
             recipient_name:  ap.full_name || "",
             template_key:    "class_slot_cancelled",
-            subject:         "Important: Your Foundation School class has been cancelled",
+            subject:         "Important: Your Rock Solid class has been cancelled",
             status:          "Pending",
             payload: {
               first_name:   String(ap.full_name || "Student").split(/\s+/)[0],
@@ -706,3 +830,4 @@
   </script>
 </body>
 </html>
+

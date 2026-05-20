@@ -19,10 +19,11 @@
   }
 
   API._requireSupabase = function () {
-    if (!window.supabase || typeof window.supabase.from !== "function") {
-      throw new Error("Supabase client is not initialized on window.supabase.");
+    const client = window.FS_SUPABASE_CLIENT || window.supabase;
+    if (!client || typeof client.from !== "function") {
+      throw new Error("Supabase client is not initialized.");
     }
-    return window.supabase;
+    return client;
   };
 
   API.select = async function (table, queryBuilder) {

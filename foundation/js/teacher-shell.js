@@ -1,6 +1,8 @@
 (function () {
   const KEY = "fs_theme";
   const Shell = (window.FSTeacherShell = window.FSTeacherShell || {});
+  let accessCheckPromise = null;
+  let shellMounted = false;
   function resolveLoginPath() {
     const p = window.location.pathname || "";
     return p.includes("/foundation/") ? "/foundation/auth/login.html" : "/auth/login.html";
@@ -53,6 +55,8 @@
   }
 
   async function enforceTeacherAccess() {
+    if (accessCheckPromise) return accessCheckPromise;
+    accessCheckPromise = (async () => {
     try {
       const auth = await import("../auth/auth-client.js");
       const session = await auth.getSessionOrNull();
@@ -104,7 +108,11 @@
       console.error("Teacher access enforcement error:", error);
       document.body.innerHTML = '<main class="fs-page"><section class="card"><h2 style="margin:0 0 8px;">Access Denied</h2><p>Unable to verify your teacher access. Please sign in again or contact your administrator.</p></section></main>';
       return false;
+    } finally {
+      accessCheckPromise = null;
     }
+    })();
+    return accessCheckPromise;
   }
 
   Shell.mount = function mount(opts) {
@@ -118,6 +126,11 @@
       { href: "../teacher/index.html?section=availability", icon: "&#x1F4C5;", label: "Availability", key: "availability" },
     ];
 
+    // Remove any accidental duplicate shells from previous buggy mounts.
+    const existing = document.querySelectorAll(".fs-shell-nav");
+    if (existing.length > 1) {
+      for (let i = 1; i < existing.length; i += 1) existing[i].remove();
+    }
     if (!document.querySelector(".fs-shell-nav")) {
       ensureManrope();
       const nav = document.createElement("nav");
@@ -149,5 +162,11 @@
     if (opts.enforceAccess !== false) {
       enforceTeacherAccess();
     }
+    shellMounted = true;
+  };
+
+  Shell.unmount = function unmount() {
+    document.querySelectorAll(".fs-shell-nav").forEach((el) => el.remove());
+    shellMounted = false;
   };
 })();

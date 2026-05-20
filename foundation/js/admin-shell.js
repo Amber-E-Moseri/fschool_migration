@@ -15,24 +15,26 @@
   const THEME_KEY = "fs_admin_theme";
   const COLLAPSE_KEY = "fs_admin_sidebar_collapsed";
   const Shell = (window.FSAdminShell = window.FSAdminShell || {});
+  const OPERATIONAL_ROLES = ["regional_secretary", "principal", "subgroup_admin", "pastor", "admin", "superadmin"];
+  const DATA_EXPORT_ROLES = ["teacher", ...OPERATIONAL_ROLES];
+  const SYSTEM_ADMIN_ROLES = ["admin", "superadmin"];
 
   const NAV_SECTIONS = [
     {
       label: "Overview",
       items: [
-        { key: "dashboard", label: "Dashboard", href: "admin-dashboard.html", icon: "DB" },
-        { key: "portal", label: "Admin Portal", href: "admin-portal.html", icon: "AP" }
+        { key: "dashboard", label: "Dashboard", href: "dashboards.html", icon: "DB", roles: OPERATIONAL_ROLES },
+        { key: "portal", label: "Admin Portal", href: "admin-portal.html", icon: "AP", roles: SYSTEM_ADMIN_ROLES }
       ]
     },
     {
       label: "Operations",
       items: [
-        { key: "batch", label: "Batch Management", href: "batch-management.html", icon: "BM" },
-        { key: "registrations", label: "Admin Review", href: "admin-review.html", icon: "AR" },
-        { key: "applicants", label: "Applicant Dir.", href: "applicant-directory.html", icon: "AD" },
-        { key: "waitlist", label: "Waitlist", href: "waitlist.html", icon: "WL" },
-        { key: "classeditor", label: "Class Editor", href: "class-editor.html", icon: "CE" },
-        { key: "dashboards", label: "Dashboards", href: "dashboards.html", icon: "DS" }
+        { key: "batch", label: "Batch Management", href: "batch-management.html", icon: "BM", roles: OPERATIONAL_ROLES },
+        { key: "registrations", label: "Admin Review", href: "admin-review.html", icon: "AR", roles: OPERATIONAL_ROLES },
+        { key: "applicants", label: "Applicant Dir.", href: "applicant-directory.html", icon: "AD", roles: OPERATIONAL_ROLES },
+        { key: "waitlist", label: "Waitlist", href: "waitlist.html", icon: "WL", roles: OPERATIONAL_ROLES },
+        { key: "classeditor", label: "Class Editor", href: "class-editor.html", icon: "CE", roles: OPERATIONAL_ROLES }
       ]
     },
     {
@@ -43,29 +45,29 @@
           label: "Reports",
           href: "reports.html",
           icon: "RP",
-          roles: ["principal", "subgroup_admin", "pastor", "admin", "superadmin"],
+          roles: OPERATIONAL_ROLES,
         },
         {
           key: "dataexports",
           label: "Data Exports",
           href: "data-exports.html",
           icon: "DE",
-          roles: ["teacher", "principal", "subgroup_admin", "pastor", "admin", "superadmin"],
+          roles: DATA_EXPORT_ROLES,
         },
         {
           key: "baptismreport",
           label: "Baptism Report",
           href: "baptism-report.html",
           icon: "BR",
-          roles: ["principal", "subgroup_admin", "pastor", "admin", "superadmin"],
+          roles: OPERATIONAL_ROLES,
         },
       ]
     },
     {
       label: "Teaching",
       items: [
-        { key: "teachers", label: "Teachers", href: "teacher-management.html", icon: "TM" },
-        { key: "atrisk", label: "At Risk Students", href: "at-risk-students.html", icon: "AR", roles: ["principal", "subgroup_admin", "pastor", "admin", "superadmin"] },
+        { key: "teachers", label: "Teachers", href: "teacher-management.html", icon: "TM", roles: OPERATIONAL_ROLES },
+        { key: "atrisk", label: "At Risk Students", href: "at-risk-students.html", icon: "AR", roles: OPERATIONAL_ROLES },
         { key: "attendance", label: "Attendance", href: "TeacherAttendancePortal.html", icon: "AT" },
         { key: "schedule", label: "Schedule", href: "teacher-schedule.html", icon: "SC" },
         { key: "progress", label: "Student Progress", href: "StudentProgressView.html", icon: "SP" }
@@ -74,8 +76,8 @@
     {
       label: "Comms",
       items: [
-        { key: "notifications", label: "Notifications", href: "notification-center.html", icon: "NT" },
-        { key: "email", label: "Email Campaigns", href: "email-campaigns.html", icon: "EM" }
+        { key: "notifications", label: "Notifications", href: "notification-center.html", icon: "NT", roles: OPERATIONAL_ROLES },
+        { key: "email", label: "Email Campaigns", href: "email-campaigns.html", icon: "EM", roles: OPERATIONAL_ROLES }
       ]
     },
     {
@@ -88,12 +90,13 @@
     {
       label: "System",
       items: [
-        { key: "adminmanagement", label: "Admin Management", href: "admin-management.html", icon: "AM" },
-        { key: "failedsyncs", label: "Failed Syncs", href: "failed-sync-retry-center.html", icon: "FS" },
-        { key: "health", label: "System Health", href: "system-health.html", icon: "SH" },
-        { key: "moodlesettings", label: "Moodle Settings", href: "moodle-settings.html", icon: "MD" },
-        { key: "audit", label: "Audit Log", href: "audit-log.html", icon: "LG" },
-        { key: "milestones", label: "Milestones", href: "milestones-admin.html", icon: "MS" }
+        { key: "fellowships", label: "Fellowships", href: "fellowship-management.html", icon: "FG", roles: OPERATIONAL_ROLES },
+        { key: "adminmanagement", label: "Admin Management", href: "admin-management.html", icon: "AM", roles: SYSTEM_ADMIN_ROLES },
+        { key: "failedsyncs", label: "Failed Syncs", href: "failed-sync-retry-center.html", icon: "FS", roles: SYSTEM_ADMIN_ROLES },
+        { key: "health", label: "System Health", href: "system-health.html", icon: "SH", roles: SYSTEM_ADMIN_ROLES },
+        { key: "moodlesettings", label: "Moodle Settings", href: "moodle-settings.html", icon: "MD", roles: SYSTEM_ADMIN_ROLES },
+        { key: "audit", label: "Audit Log", href: "audit-log.html", icon: "LG", roles: SYSTEM_ADMIN_ROLES },
+        { key: "milestones", label: "Milestones", href: "milestones-admin.html", icon: "MS", roles: OPERATIONAL_ROLES }
       ]
     }
   ];
@@ -104,9 +107,9 @@
     "batch",
     "registrations",
     "applicants",
-    "dashboards",
     "notifications",
     "email",
+    "fellowships",
     "failedsyncs",
     "health",
     "moodlesettings",
@@ -168,6 +171,7 @@
   function inferActive() {
     const p = (window.location.pathname || "").toLowerCase();
     if (p.includes("admin-dashboard")) return "dashboard";
+    if (p.includes("dashboards")) return "dashboard";
     if (p.includes("admin-portal")) return "portal";
     if (p.includes("batch-management")) return "batch";
     if (p.includes("admin-review")) return "registrations";
@@ -183,7 +187,6 @@
     if (p.includes("audit-log")) return "audit";
     if (p.includes("milestones-admin")) return "milestones";
     if (p.includes("admin-management")) return "adminmanagement";
-    if (p.includes("dashboards")) return "dashboards";
     if (p.includes("data-exports")) return "dataexports";
     if (p.includes("baptism-report")) return "baptismreport";
     if (p.includes("reports")) return "reports";
@@ -193,6 +196,7 @@
     if (p.includes("role-audit")) return "roleaudit";
     if (p.includes("waitlist")) return "waitlist";
     if (p.includes("class-editor")) return "classeditor";
+    if (p.includes("fellowship-management")) return "fellowships";
     return "";
   }
 
@@ -275,9 +279,9 @@
     sidebar.id = "fs-admin-sb";
     sidebar.innerHTML = `
       <div class="sb-logo">
-        <div class="sb-mark">FS</div>
+        <div class="sb-mark">RS</div>
         <div>
-          <div class="sb-name">Foundation School</div>
+          <div class="sb-name">Rock Solid</div>
           <div class="sb-sub">Admin Portal</div>
         </div>
       </div>

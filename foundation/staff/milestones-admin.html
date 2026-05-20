@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -20,28 +20,28 @@
     .btn.primary { background: var(--primary); color: #fff; border-color: color-mix(in srgb, var(--primary) 80%, black); }
     .btn.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bd); }
     .btn.small { padding: 6px 10px; font-size: 12px; }
-    .card { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; box-shadow: var(--shadow-soft); }
+    .card { margin-top: 10px; background: var(--color-surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; box-shadow: var(--shadow-soft); }
     .filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
     .def-form { display: grid; grid-template-columns: 1.2fr 1.6fr .9fr .8fr auto; gap: 8px; align-items: end; }
-    label { display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 700; letter-spacing: .05em; }
+    label { display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; color: var(--color-text-muted); font-weight: 700; letter-spacing: .05em; }
     input, select { width: 100%; padding: 10px; }
     .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
     table { width: 100%; border-collapse: collapse; min-width: 1100px; }
     th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12px; }
-    th { background: var(--surface-2); color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    th { background: var(--surface-2); color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { border-radius: 999px; border: 1px solid var(--line); background: color-mix(in srgb, var(--soft-lavender) 70%, var(--surface)); color: var(--primary); font-size: 11px; font-weight: 700; padding: 5px 9px; cursor: pointer; }
+    .chip { border-radius: 999px; border: 1px solid var(--line); background: color-mix(in srgb, var(--soft-lavender) 70%, var(--color-surface)); color: var(--primary); font-size: 11px; font-weight: 700; padding: 5px 9px; cursor: pointer; }
     .chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
     .fs-badge { border-radius: 999px; font-size: 11px; font-weight: 700; padding: 4px 9px; border: 1px solid var(--line); }
-    .ok { color: #166534; background: color-mix(in srgb, #22c55e 12%, var(--surface)); border-color: color-mix(in srgb, #22c55e 34%, var(--surface)); }
-    .warn { color: #b45309; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); border-color: color-mix(in srgb, #f59e0b 35%, var(--surface)); }
+    .ok { color: #166534; background: color-mix(in srgb, #22c55e 12%, var(--color-surface)); border-color: color-mix(in srgb, #22c55e 34%, var(--color-surface)); }
+    .warn { color: #b45309; background: color-mix(in srgb, #f59e0b 14%, var(--color-surface)); border-color: color-mix(in srgb, #f59e0b 35%, var(--color-surface)); }
     .timeline { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
     .event { display: flex; justify-content: space-between; gap: 8px; padding: 9px; border-bottom: 1px solid var(--line); font-size: 12px; }
     .event:last-child { border-bottom: 0; }
-    .muted { color: var(--muted); }
+    .muted { color: var(--color-text-muted); }
     .msg { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
-    .bad { color: #b42318; background: color-mix(in srgb, #ef4444 13%, var(--surface)); border-color: color-mix(in srgb, #ef4444 34%, var(--surface)); }
-    .good { color: #166534; background: color-mix(in srgb, #22c55e 12%, var(--surface)); border-color: color-mix(in srgb, #22c55e 34%, var(--surface)); }
+    .bad { color: #b42318; background: color-mix(in srgb, #ef4444 13%, var(--color-surface)); border-color: color-mix(in srgb, #ef4444 34%, var(--color-surface)); }
+    .good { color: #166534; background: color-mix(in srgb, #22c55e 12%, var(--color-surface)); border-color: color-mix(in srgb, #22c55e 34%, var(--color-surface)); }
     .hidden { display: none !important; }
     @media (max-width: 1080px) {
       .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -221,7 +221,7 @@ function renderRows() {
       <td>${esc(a.fellowship_code || a.fellowship || a.subgroup_id || "-")}</td>
       <td>${esc(a.class_option_id || "-")}</td>
       <td><span class="fs-badge ${done.size ? "fs-badge-success" : "fs-badge-warning"}">${done.size ? "Active Progress" : "No Milestones Yet"}</span></td>
-      <td><div class="chips">${chips}</div></td>
+      <td><div class="fs-badges">${chips}</div></td>
       <td><button class="fs-btn fs-btn-secondary fs-btn-sm" data-open="${esc(a.id)}">Open Timeline</button></td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" class="muted">No students match the selected filters.</td></tr>`;
@@ -288,7 +288,7 @@ function openTimeline(applicantId) {
   ].sort((a,b) => new Date(b.at || 0) - new Date(a.at || 0));
 
   $("timeline").innerHTML = `<div class="event"><strong>${esc(app?.full_name || "Student")}</strong><span class="muted">${esc(app?.email || "-")}</span></div>` +
-    (merged.map((e) => `<div class="event"><span>${esc(e.label)} · ${esc(e.state)}</span><span class="muted">${esc(fmt(e.at))}</span></div>`).join("") || `<div class="event"><span class="muted">No milestone or audit history found yet.</span></div>`);
+    (merged.map((e) => `<div class="event"><span>${esc(e.label)} � ${esc(e.state)}</span><span class="muted">${esc(fmt(e.at))}</span></div>`).join("") || `<div class="event"><span class="muted">No milestone or audit history found yet.</span></div>`);
 
   $("timeline").closest("section").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -452,12 +452,14 @@ async function boot() {
 
 boot().catch((e) => flash(`Failed to load milestones admin: ${e.message || e}`, "bad"));
 </script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script>
     window.FSAdminShell && window.FSAdminShell.mount({ active: "milestones", pageTitle: "Milestones" });
   </script>
 </body>
 </html>
+
+
 
 
 

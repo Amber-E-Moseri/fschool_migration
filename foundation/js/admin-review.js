@@ -1,4 +1,4 @@
-import { supabase, requireSession, getCurrentProfile, requireRole } from "../auth/auth-client.js";
+﻿import { supabase, requireSession, getCurrentProfile, requireRole } from "../auth/auth-client.js";
 
 const STATUS_ORDER = [
   "PENDING",
@@ -60,6 +60,18 @@ function applicantName(app) {
   return app.full_name || [app.first_name, app.last_name].filter(Boolean).join(" ") || "Unnamed Applicant";
 }
 
+function displayGroupValue(app) {
+  const isRegional = String(app?.fellowship_code || "").toUpperCase() === "REGIONAL";
+  if (isRegional && !app?.group_id) return "Regional";
+  return app?.group_id || "-";
+}
+
+function displaySubgroupValue(app) {
+  const isRegional = String(app?.fellowship_code || "").toUpperCase() === "REGIONAL";
+  if (isRegional && !app?.subgroup_id) return "Regional";
+  return app?.subgroup_id || "-";
+}
+
 function activeBatches() {
   return state.batches.filter((b) => b.active === true || String(b.status || "").toUpperCase() === "ACTIVE");
 }
@@ -87,12 +99,14 @@ function filteredApplicants() {
   const q = String($("searchInput")?.value || "").toLowerCase().trim();
   const status = String($("statusFilter")?.value || "");
   const fellowship = String($("fellowshipFilter")?.value || "");
+  const subgroup = String($("subgroupFilter")?.value || "");
 
   return state.applicants.filter((app) => {
     const st = normalizedRegistrationStatus(app);
     if (status && st !== status) return false;
-    const fellowshipVal = String(app.fellowship_code || app.fellowship_name || app.subgroup_id || "");
+    const fellowshipVal = String(app.fellowship_code || app.fellowship_name || "");
     if (fellowship && fellowshipVal !== fellowship) return false;
+    if (subgroup && String(app.subgroup_id || "") !== subgroup) return false;
     if (!q) return true;
     const hay = [applicantName(app), app.email, app.phone, app.fellowship_code, app.group_id, app.subgroup_id].join(" ").toLowerCase();
     return hay.includes(q);
@@ -123,9 +137,13 @@ function renderFilters() {
   const statusFilter = $("statusFilter");
   statusFilter.innerHTML = `<option value="">All statuses</option>${STATUS_ORDER.map((s) => `<option value="${s}">${s}</option>`).join("")}`;
 
-  const fellowships = [...new Set(state.applicants.map((a) => a.fellowship_code || a.fellowship_name || a.subgroup_id).filter(Boolean))]
+  const fellowships = [...new Set(state.applicants.map((a) => a.fellowship_code || a.fellowship_name).filter(Boolean))]
     .sort((a, b) => String(a).localeCompare(String(b)));
   $("fellowshipFilter").innerHTML = `<option value="">All fellowships</option>${fellowships.map((f) => `<option value="${esc(f)}">${esc(f)}</option>`).join("")}`;
+
+  const subgroups = [...new Set(state.applicants.map((a) => a.subgroup_id).filter(Boolean))]
+    .sort((a, b) => String(a).localeCompare(String(b)));
+  $("subgroupFilter").innerHTML = `<option value="">All subgroups</option>${subgroups.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}`;
 }
 
 function renderTable(rows) {
@@ -145,7 +163,7 @@ function renderTable(rows) {
       <tr>
         <td><strong>${esc(applicantName(app))}</strong>${duplicateWarning}</td>
         <td>${esc(app.email || "-")}<br><span style="color:var(--muted)">${esc(app.phone || "-")}</span></td>
-        <td>${esc(app.fellowship_code || app.fellowship_name || "-")}<br><span style="color:var(--muted)">${esc(app.group_id || "-")} / ${esc(app.subgroup_id || "-")}</span></td>
+        <td>${esc(app.fellowship_code || app.fellowship_name || "-")}<br><span style="color:var(--muted)">${esc(displayGroupValue(app))} / ${esc(displaySubgroupValue(app))}</span></td>
         <td>${esc(preferredTime(app))}</td>
         <td><span class="${statusClass(status)}">${esc(status)}</span></td>
         <td>${esc(classLabel)}</td>
@@ -162,8 +180,8 @@ function renderTable(rows) {
           <strong>${esc(applicantName(app))}</strong>
           <span class="${statusClass(status)}">${esc(status)}</span>
         </div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted)">${esc(app.email || "-")} � ${esc(app.phone || "-")}</div>
-        <div style="margin-top:6px;font-size:12px">${esc(app.fellowship_code || "-")} � ${esc(preferredTime(app))}</div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted)">${esc(app.email || "-")} &middot; ${esc(app.phone || "-")}</div>
+        <div style="margin-top:6px;font-size:12px">${esc(app.fellowship_code || "-")} &middot; ${esc(preferredTime(app))}</div>
         <div class="actions" style="margin-top:8px"><button class="btn" data-open="${esc(app.id)}">Open</button></div>
       </article>
     `;
@@ -178,9 +196,72 @@ function groupDuplicates() {
     if (!byEmail.has(email)) byEmail.set(email, []);
     byEmail.get(email).push(app);
   }
-  return [...byEmail.values()].filter((g) => g.length > 1);
+  // Only show unresolved duplicate groups:
+  // once a group has a single kept record and the rest marked DUPLICATE,
+  // hide it from the duplicate resolution panel.
+  return [...byEmail.values()].filter((g) => {
+    if (g.length <= 1) return false;
+    const nonDuplicate = g.filter((app) => normalizedRegistrationStatus(app) !== "DUPLICATE");
+    return nonDuplicate.length > 1;
+  });
 }
 
+async function resolveDuplicateGroup(email, keepId) {
+  const normalizedEmail = String(email || "").toLowerCase().trim();
+  const group = state.applicants.filter((a) => String(a.email || "").toLowerCase().trim() === normalizedEmail);
+  if (group.length < 2) return;
+  const keep = group.find((a) => String(a.id) === String(keepId));
+  if (!keep) return;
+
+  const now = new Date().toISOString();
+  const others = group.filter((a) => String(a.id) !== String(keepId));
+
+  try {
+    const { error: keepErr } = await supabase
+      .from("applicants")
+      .update({
+        registration_status: "PENDING",
+        needs_admin_review: false,
+        reviewed_at: now,
+        updated_at: now,
+        updated_by: state.profile?.email || null,
+      })
+      .eq("id", keep.id);
+    if (keepErr) throw keepErr;
+
+    for (const rec of others) {
+      const { error: dupErr } = await supabase
+        .from("applicants")
+        .update({
+          registration_status: "DUPLICATE",
+          needs_admin_review: true,
+          reviewed_at: now,
+          updated_at: now,
+          updated_by: state.profile?.email || null,
+        })
+        .eq("id", rec.id);
+      if (dupErr) throw dupErr;
+    }
+
+    await logAudit("DUPLICATE_GROUP_RESOLVED", {
+      entity_id: String(keep.id),
+      details: {
+        email: normalizedEmail,
+        kept_applicant_id: keep.id,
+        duplicate_applicant_ids: others.map((r) => r.id),
+      },
+    });
+
+    showFlash("Duplicate group resolved.", "success");
+    toast("Duplicate resolved", "success");
+    await loadData();
+    openDetail(keep.id);
+  } catch (err) {
+    console.error("DUPLICATE_GROUP_RESOLVE_FAILED", { email: normalizedEmail, keepId, error: err?.message || err });
+    showFlash(`Duplicate resolution failed: ${err?.message || err}`, "error");
+    toast("Duplicate resolution failed", "error");
+  }
+}
 function renderDuplicates() {
   const groups = groupDuplicates();
   const section = document.getElementById("dupSection");
@@ -196,37 +277,45 @@ function renderDuplicates() {
 
   body.innerHTML = groups.map((group) => {
     const sorted = [...group].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-    const rows = sorted.map((app, idx) => {
+    const cards = sorted.map((app) => {
       const st = normalizedRegistrationStatus(app);
-      const isPrimary = idx === 0;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--color-border)">
-        <div>
-          <strong>${esc(applicantName(app))}</strong>${isPrimary ? ` <span style="font-size:11px;color:var(--color-success-fg);font-weight:600">PRIMARY</span>` : ""}
-          <div style="font-size:12px;color:var(--color-text-muted)">${esc(app.email || "-")} · ${esc(app.fellowship_code || "-")} · <span class="${statusClass(st)}">${esc(st)}</span></div>
+      const created = app.created_at ? new Date(app.created_at).toLocaleString() : "-";
+      return `<article style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-3);background:var(--color-surface)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+          <strong>${esc(applicantName(app))}</strong>
+          <span class="${statusClass(st)}">${esc(st)}</span>
         </div>
-        <div class="actions">
-          ${!isPrimary ? `<button class="btn" data-dup-dismiss="${esc(app.id)}">Dismiss</button>` : ""}
-          <button class="btn" data-dup-flag="${esc(app.id)}">Flag Review</button>
+        <div style="font-size:12px;color:var(--color-text-muted);display:grid;gap:2px">
+          <div><strong>Email:</strong> ${esc(app.email || "-")}</div>
+          <div><strong>Phone:</strong> ${esc(app.phone || "-")}</div>
+          <div><strong>Fellowship:</strong> ${esc(app.fellowship_code || "-")}</div>
+          <div><strong>Preferred:</strong> ${esc(preferredTime(app))}</div>
+          <div><strong>Created:</strong> ${esc(created)}</div>
+          <div><strong>Class:</strong> ${esc(app.class_option_id || "Unassigned")}</div>
+        </div>
+        <div class="actions" style="margin-top:8px">
+          <button class="btn" data-dup-keep="${esc(app.id)}" data-dup-email="${esc(app.email || "")}">Keep This Record</button>
           <button class="btn" data-open="${esc(app.id)}">Open</button>
+          <button class="btn" data-dup-flag="${esc(app.id)}">Flag Review</button>
         </div>
-      </div>`;
+      </article>`;
     }).join("");
     return `<div style="margin-bottom:var(--space-3);padding:var(--space-3);border:1px solid color-mix(in srgb,var(--color-danger-fg) 20%,transparent);border-radius:var(--radius-md);background:var(--color-danger-bg)">
-      <div style="font-size:12px;font-weight:700;color:var(--color-danger-fg);margin-bottom:4px">${esc(sorted[0].email || "")} — ${sorted.length} registrations</div>
-      ${rows}
+      <div style="font-size:12px;font-weight:700;color:var(--color-danger-fg);margin-bottom:8px">${esc(sorted[0].email || "")} — ${sorted.length} registrations</div>
+      <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">${cards}</div>
     </div>`;
   }).join("");
 
-  // Wire dismiss + flag buttons
-  body.querySelectorAll("[data-dup-dismiss]").forEach((btn) => {
+  body.querySelectorAll("[data-dup-keep]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const id = btn.getAttribute("data-dup-dismiss");
-      await markStatus("DUPLICATE");
-      state.selectedApplicantId = id;
-      await markStatus("DUPLICATE");
-      await loadData();
+      const id = btn.getAttribute("data-dup-keep");
+      const email = btn.getAttribute("data-dup-email");
+      if (!id || !email) return;
+      if (!confirm("Keep this record and mark the other duplicates as DUPLICATE?")) return;
+      await resolveDuplicateGroup(email, id);
     });
   });
+
   body.querySelectorAll("[data-dup-flag]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       state.selectedApplicantId = btn.getAttribute("data-dup-flag");
@@ -234,7 +323,6 @@ function renderDuplicates() {
     });
   });
 }
-
 function renderAll() {
   const rows = filteredApplicants();
   renderSummary(rows);
@@ -253,7 +341,7 @@ function renderDetail(app) {
     ["Email", app.email || "-"],
     ["Phone", app.phone || "-"],
     ["Fellowship", app.fellowship_code || app.fellowship_name || "-"],
-    ["Group/Subgroup", `${app.group_id || "-"} / ${app.subgroup_id || "-"}`],
+    ["Group/Subgroup", `${displayGroupValue(app)} / ${displaySubgroupValue(app)}`],
     ["Preferred Time", preferredTime(app)],
     ["Class Option", app.class_option_id || "Unassigned"],
     ["Batch", app.batch_id || "-"],
@@ -300,7 +388,7 @@ function repopulateClassOptions() {
   const batchId = $("assignBatch").value;
   const list = activeClassOptions().filter((c) => !batchId || String(c.batch_id || "") === String(batchId));
   $("assignClass").innerHTML = list.length
-    ? list.map((c) => `<option value="${esc(c.class_option_id)}">${esc(c.class_option_id)} � ${esc(c.day || "")} ${esc(c.class_time || "")}</option>`).join("")
+    ? list.map((c) => `<option value="${esc(c.class_option_id)}">${esc(c.class_option_id)} &mdash; ${esc(c.day || "")} ${esc(c.class_time || "")}</option>`).join("")
     : `<option value="">No active class options for selected batch</option>`;
   updateAssignInfo();
 }
@@ -314,7 +402,7 @@ function updateAssignInfo() {
   const cap = computeCapacity(classId);
   const cls = byId(state.classOptions, classId, "class_option_id");
   const capText = cap.max > 0 ? `${cap.current}/${cap.max}` : `${cap.current}/unlimited`;
-  $("assignInfo").textContent = `${cls?.day || ""} ${cls?.class_time || ""} � Capacity ${capText}${cap.full ? " (FULL)" : ""}`;
+  $("assignInfo").textContent = `${cls?.day || ""} ${cls?.class_time || ""} — Capacity ${capText}${cap.full ? " (FULL)" : ""}`;
 }
 
 async function logAudit(action, payload = {}) {
@@ -356,120 +444,25 @@ async function assignApplicant() {
   }
 
   const cls = byId(state.classOptions, classOptionId, "class_option_id");
-  const now = new Date().toISOString();
   const duplicateAttempt = String(app.class_option_id || "") === classOptionId && String(app.batch_id || "") === batchId;
 
   state.assigning = true;
   $("assignBtn").disabled = true;
 
   try {
-    let student = null;
-    if (app.email) {
-      const existing = await supabase.from("students").select("*").eq("email", app.email).maybeSingle();
-      if (existing.error && existing.error.code !== "PGRST116") throw existing.error;
-      student = existing.data || null;
-    }
-
-    const studentId = student?.student_id || buildStudentId(app);
-    const studentPayload = {
-      student_id: studentId,
-      full_name: applicantName(app),
-      email: app.email,
-      phone: app.phone || null,
-      group_id: firstDefined(app.group_id, cls?.group_id, "UNSET"),
-      subgroup_id: firstDefined(app.subgroup_id, cls?.subgroup_id, "UNSET"),
-      fellowship_code: firstDefined(app.fellowship_code, cls?.subgroup_id, null),
-      batch_id: batchId,
-      class_option_id: classOptionId,
-      teacher_id: cls?.teacher_id || null,
-      teacher_name: cls?.teacher_name || null,
-      status: "Active",
-      created_by: state.profile?.email || null,
-      updated_by: state.profile?.email || null,
-      deleted_at: null,
-      updated_at: now,
-    };
-
-    if (student) {
-      const { error: updateStudentError } = await supabase
-        .from("students")
-        .update(studentPayload)
-        .eq("student_id", student.student_id);
-      if (updateStudentError) throw updateStudentError;
-    } else {
-      const { error: insertStudentError } = await supabase.from("students").insert({
-        ...studentPayload,
-        created_at: now,
-      });
-      if (insertStudentError) throw insertStudentError;
-    }
-
-    const rosterPayload = {
-      student_id: studentId,
-      class_option_id: classOptionId,
-      batch_id: batchId,
-      group_id: firstDefined(app.group_id, cls?.group_id, "UNSET"),
-      subgroup_id: firstDefined(app.subgroup_id, cls?.subgroup_id, "UNSET"),
-      status: "Active",
-      enrolled_at: now,
-      created_by: state.profile?.email || null,
-      updated_by: state.profile?.email || null,
-      updated_at: now,
-    };
-
-    const { error: rosterError } = await supabase
-      .from("class_roster")
-      .upsert(rosterPayload, { onConflict: "student_id,class_option_id,batch_id" });
-    if (rosterError) throw rosterError;
-
-    const attempts = Number(app.assignment_attempts || 0) + 1;
-    const { error: appError } = await supabase
-      .from("applicants")
-      .update({
+    const { data, error } = await supabase.functions.invoke("admin-api", {
+      body: {
+        action: "assign-applicant-admin",
+        applicant_id: app.id,
         class_option_id: classOptionId,
         batch_id: batchId,
-        registration_status: "ASSIGNED",
-        availability_status: "CLASS_ASSIGNED",
-        assigned_at: now,
-        reviewed_at: now,
-        waitlisted_at: null,
-        retry_assignment: false,
-        assignment_attempts: attempts,
-        needs_admin_review: false,
-        status: "Enrolled",
-        updated_at: now,
-        updated_by: state.profile?.email || null,
-      })
-      .eq("id", app.id);
-    if (appError) throw appError;
-
-    const dedupeKey = `applicant:${app.id}:class:${classOptionId}:batch:${batchId}`;
-    const moodlePayload = {
-      applicant_id: app.id,
-      student_id: studentId,
-      email: app.email,
-      full_name: applicantName(app),
-      batch_id: batchId,
-      class_option_id: classOptionId,
-      registration_status: "ASSIGNED",
-      sync_status: "PENDING",
-      dedupe_key: dedupeKey,
-      retry_requested_at: now,
-      updated_at: now,
-      payload: { source: "admin_review_assignment", duplicate_attempt: duplicateAttempt },
-    };
-
-    const moodleRes = await supabase
-      .from("moodle_enrollment_sync")
-      .upsert(moodlePayload, { onConflict: "applicant_id" });
-    if (moodleRes.error) {
-      console.warn("MOODLE_QUEUE_UPSERT_FAILED", moodleRes.error.message);
-    }
-
-    await logAudit("APPLICANT_ASSIGNED", {
-      entity_id: String(app.id),
-      details: { applicant_id: app.id, student_id: studentId, batch_id: batchId, class_option_id: classOptionId },
+        actor_email: state.profile?.email || null,
+        duplicate_attempt: duplicateAttempt,
+      },
     });
+    if (error || !data?.ok) {
+      throw new Error(String(data?.error || error?.message || "Assignment failed"));
+    }
 
     showFlash("Applicant assigned successfully.", "success");
     toast("Applicant assigned", "success");
@@ -669,6 +662,7 @@ function wireEvents() {
   $("searchInput").addEventListener("input", renderAll);
   $("statusFilter").addEventListener("change", renderAll);
   $("fellowshipFilter").addEventListener("change", renderAll);
+  $("subgroupFilter").addEventListener("change", renderAll);
   $("refreshBtn").addEventListener("click", loadData);
 
   document.addEventListener("click", (e) => {
@@ -702,7 +696,7 @@ function wireEvents() {
 async function boot() {
   if (!window.FS_CONFIG || !window.FS_CONFIG.SUPABASE_URL) {
     window.FSAdminShell && window.FSAdminShell.mount({ active: "registrations", pageTitle: "Admin Review", profileName: "Not connected" });
-    showFlash("⚠ Not connected — open this page through a live server with config.js in place to load data", "error");
+    showFlash("Not connected — open this page through a live server with config.js in place to load data", "error");
     return;
   }
   const session = await requireSession();
@@ -728,6 +722,5 @@ boot().catch((err) => {
   console.error("ADMIN_REVIEW_BOOT_FAILED", err);
   showFlash(`Unable to initialize admin review: ${err?.message || err}`, "error");
 });
-
 
 

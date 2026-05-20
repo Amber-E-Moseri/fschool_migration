@@ -121,7 +121,7 @@ function renderPortal() {
   if (isSuperadmin()) {
     main.append(
       mkSection('batch-mgmt',         'Batch Management',
-        '<button class="btn-sm btn-approve" onclick="openBatchModal(null)">+ Create Batch</button>'),
+        '<button class="btn-sm btn-approve" onclick="openPortalPage(\'batch-management.html\',\'superadmin\')">+ Create Batch</button>'),
       mkSection('admin-tools',        'Admin Tools'),
       mkSection('pending-teachers',   'Pending Teacher Approvals'),
       mkSection('suspended-teachers', 'Suspended Teachers Review'),
@@ -233,6 +233,22 @@ function loadAdminTools() {
   `)
 }
 window.loadAdminTools = loadAdminTools
+window.loadPendingTeachers = loadPendingTeachers
+window.loadSuspendedTeachers = loadSuspendedTeachers
+window.loadPendingAvail = loadPendingAvail
+window.loadDashboards = loadDashboards
+window.loadAdminUsers = loadAdminUsers
+window.approveTeacher = approveTeacher
+window.rejectTeacher = rejectTeacher
+window.confirmSuspension = confirmSuspension
+window.reinstateTeacher = reinstateTeacher
+window.approveAvail = approveAvail
+window.rejectAvail = rejectAvail
+window.openPortalPage = openPortalPage
+window.openNotificationCenter = openNotificationCenter
+window.openModal = openModal
+window.closeModal = closeModal
+window.confirmSuspend = confirmSuspend
 
 function mkTable(heads, rows) {
   if (!rows.length) return '<p class="empty-state">No records found.</p>'

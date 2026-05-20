@@ -284,44 +284,55 @@
       } catch(e){ el.innerHTML = `<div class="error">${esc(e.message)}</div>`; }
     }
 
+    let __teacherShellMountInFlight = false;
+    let __teacherShellMounted = false;
+
     async function mountTeacherShell() {
-      const inTeacherFrame = window.self !== window.top &&
-        window.parent?.location?.pathname?.includes('teacher/');
-      if (!inTeacherFrame && window.FSAdminShell && typeof window.FSAdminShell.mount === "function") {
-        await window.FSAdminShell.mount({
-          active: "attendance",
-          profileName: state.teacher?.fullName || "Teacher",
-          role: "teacher",
-          pageTitle: "Attendance",
-          portalName: "Rock Solid",
-          portalSubtitle: "Teacher Portal",
-        });
-      }
-      const sbName = document.querySelector('.sb-name');
-      const sbSub = document.querySelector('.sb-sub');
-      if (sbName) sbName.textContent = 'Rock Solid';
-      if (sbSub) sbSub.textContent = 'Teacher Portal';
-
-      let sessionEmail = "";
+      if (__teacherShellMountInFlight) return;
+      __teacherShellMountInFlight = true;
       try {
-        const sessionClient = ensureSupabaseClient();
-        if (sessionClient?.auth?.getSession) {
-          const sessionRes = await sessionClient.auth.getSession();
-          sessionEmail = String(sessionRes?.data?.session?.user?.email || "").trim();
+        const inTeacherFrame = window.self !== window.top &&
+          window.parent?.location?.pathname?.includes('teacher/');
+        if (!inTeacherFrame && !__teacherShellMounted && window.FSAdminShell && typeof window.FSAdminShell.mount === "function") {
+          const activeRole = String(window.FS_ACTIVE_ROLE || "admin").toLowerCase();
+          await window.FSAdminShell.mount({
+            active: "attendance",
+            profileName: state.teacher?.fullName || "Teacher",
+            role: activeRole,
+            pageTitle: "Attendance",
+            portalName: "Rock Solid",
+            portalSubtitle: "Teacher Portal",
+          });
+          __teacherShellMounted = true;
         }
-      } catch (_) {}
-      const nameEl = document.getElementById('fs-user-name');
-      if (nameEl) {
-        nameEl.textContent =
-          state.teacher?.fullName ||
-          state.teacher?.email ||
-          sessionEmail ||
-          'Teacher';
-      }
+        const sbName = document.querySelector('.sb-name');
+        const sbSub = document.querySelector('.sb-sub');
+        if (sbName) sbName.textContent = 'Rock Solid';
+        if (sbSub) sbSub.textContent = 'Teacher Portal';
 
-      const bcRoot = document.querySelector('.topbar-l .breadcrumb span:first-child');
-      if (bcRoot && String(bcRoot.textContent || "").trim() === 'Admin') {
-        bcRoot.textContent = 'Teacher';
+        let sessionEmail = "";
+        try {
+          const sessionClient = ensureSupabaseClient();
+          if (sessionClient?.auth?.getSession) {
+            const sessionRes = await sessionClient.auth.getSession();
+            sessionEmail = String(sessionRes?.data?.session?.user?.email || "").trim();
+          }
+        } catch (_) {}
+        const nameEl = document.getElementById('fs-user-name');
+        if (nameEl) {
+          nameEl.textContent =
+            state.teacher?.fullName ||
+            state.teacher?.email ||
+            sessionEmail ||
+            'Teacher';
+        }
+
+        const bcRoot = document.querySelector('.topbar-l .breadcrumb span:first-child');
+        if (bcRoot && String(bcRoot.textContent || "").trim() === 'Admin') {
+          bcRoot.textContent = 'Teacher';
+        }
+      } finally {
+        __teacherShellMountInFlight = false;
       }
     }
 
@@ -571,7 +582,7 @@
   <script src="../js/ui.js"></script>
   <script src="../js/toast.js"></script>
   <script src="../js/modal.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, getCurrentProfile, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
     window.FS_SUPABASE_CLIENT = supabase;
@@ -579,22 +590,21 @@
 
     const { data } = await supabase.auth.getSession();
     if (!data?.session) {
-      window.location.href = "login.html";
+      window.location.href = "../auth/login.html";
     } else {
       const profile = await getCurrentProfile();
       if (!profile || !(isAdmin(profile.role) || isRegionalSecretary(profile.role))) {
-        window.location.href = "login.html";
+        window.location.href = "../auth/login.html";
+      } else {
+        window.FS_ACTIVE_ROLE = String(profile.role || "").toLowerCase();
+        await mountTeacherShell();
       }
     }
   </script>
-  <script type="module">
-    import { supabase } from "../auth/auth-client.js";
-    window.FS_SUPABASE_CLIENT = supabase;
-    window["supabase"] = supabase;
-    mountTeacherShell();
-  </script>
 </body>
 </html>
+
+
 
 
 

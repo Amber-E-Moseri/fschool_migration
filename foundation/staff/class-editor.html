@@ -100,7 +100,19 @@
         <label>Fellowship Codes</label>
         <div class="fc-chips" id="nFcChips"></div>
       </div>
+      <div id="multiFcPrompt" class="msg" style="display:none;margin-bottom:var(--space-3)">
+        <div style="font-weight:700;margin-bottom:8px">Multiple fellowships selected. How should these be handled?</div>
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+          <input type="radio" name="multiFcMode" value="shared" checked />
+          <span><strong>Shared class (recommended for online)</strong> — one class ID, one roster, one attendance sheet. All fellowships join the same session.</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px">
+          <input type="radio" name="multiFcMode" value="separate" />
+          <span><strong>Separate classes</strong> — create one class option per fellowship with individual class IDs and rosters.</span>
+        </label>
+      </div>
       <div class="toggle-row" style="margin-bottom:var(--space-3);gap:24px;flex-wrap:wrap">
+        <label class="toggle-row"><label class="toggle"><input type="checkbox" id="nIsOnline" /><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Online class</span></label>
         <label class="toggle-row"><label class="toggle"><input type="checkbox" id="nActive" checked /><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Active</span></label>
         <label class="toggle-row"><label class="toggle"><input type="checkbox" id="nEnrollOpen" checked /><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Enrollment Open</span></label>
       </div>
@@ -134,7 +146,7 @@
   </main>
 
   <script src="../js/config.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, requireAuth, getCurrentProfile } from "../auth/auth-client.js";
 
@@ -151,9 +163,11 @@
       slots:        {},
       profile:      null,
       canEdit:      false,
+      canSuperadmin:false,
       openEditId:   null,
       newFcCodes:   [],
       editFcCodes:  {},
+      newClassMode: "shared",
     };
 
     function showFlash(msg, type = "") {
@@ -173,11 +187,25 @@
     }
 
     // ── New class ID generator ────────────────────────────────────────────────
-    function generateClassId(teacherId, day, time) {
-      const dayPart  = day ? day.slice(0, 3).toUpperCase() : "DAY";
+    function idPart(input, fallback = "X") {
+      const clean = String(input || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      return clean || fallback;
+    }
+
+    function generateSharedClassId(subgroupId, teacherId, day, time) {
+      const sgPart   = idPart(subgroupId, "SG");
+      const dayPart  = day ? idPart(day.slice(0, 3), "DAY") : "DAY";
       const timePart = time ? time.replace(":", "") : "0000";
-      const tidPart  = teacherId ? String(teacherId).slice(0, 8).toUpperCase() : "XXXX";
-      return `CO-${dayPart}-${timePart}-${tidPart}`;
+      const tidPart  = teacherId ? idPart(String(teacherId).slice(0, 8), "XXXX") : "XXXX";
+      return `CO-${sgPart}-${dayPart}-${timePart}-${tidPart}`;
+    }
+
+    function generateSeparateClassId(fellowshipCode, teacherId, day, time) {
+      const fcPart   = idPart(fellowshipCode, "REGIONAL");
+      const dayPart  = day ? idPart(day.slice(0, 3), "DAY") : "DAY";
+      const timePart = time ? time.replace(":", "") : "0000";
+      const tidPart  = teacherId ? idPart(String(teacherId).slice(0, 8), "XXXX") : "XXXX";
+      return `CO-${fcPart}-${dayPart}-${timePart}-${tidPart}`;
     }
 
     // ── FC chips ──────────────────────────────────────────────────────────────
@@ -209,6 +237,15 @@
       });
     }
 
+    function normalizedCodes(codes) {
+      return [...new Set((codes || []).map((v) => String(v || "").trim()).filter(Boolean))];
+    }
+
+    function enforceCodesForOnlineMode(codes, isOnline) {
+      const clean = normalizedCodes(codes);
+      return isOnline ? clean : (clean.length ? [clean[0]] : []);
+    }
+
     // ── Edit panel ────────────────────────────────────────────────────────────
     function renderEditPanel(co) {
       const panelId = `edit-${co.class_option_id}`;
@@ -219,9 +256,16 @@
         `<option value="${esc(t.teacher_id)}"${t.full_name === co.teacher_name ? " selected" : ""}>${esc(t.full_name)} (${esc(t.email || "")})</option>`
       ).join("");
       const dayOpts = DAYS.map((d) => `<option value="${d}"${d === co.day ? " selected" : ""}>${d}</option>`).join("");
+      const sharedNote = (co.fellowship_codes || []).length > 1
+        ? `<div class="msg" style="margin-bottom:var(--space-3)">Shared class — ${(co.fellowship_codes || []).length} fellowships on one roster</div>`
+        : "";
+      const splitBtn = (state.canSuperadmin && (co.fellowship_codes || []).length > 1)
+        ? `<button class="btn btn-danger" data-split-class="${esc(co.class_option_id)}">Split into Separate Classes</button>`
+        : "";
 
       return `<tr id="${panelId}">
         <td colspan="10" class="edit-panel">
+          ${sharedNote}
           <div class="form-grid">
             <div class="form-field">
               <label>Teacher</label>
@@ -243,17 +287,23 @@
               <label>Label Suffix</label>
               <input class="fs-input" id="esuffix-${esc(co.class_option_id)}" type="text" value="${esc(co.label_suffix || "")}" />
             </div>
+            <div class="form-field">
+              <label>Confirmed Start Date</label>
+              <input class="fs-input" id="estart-${esc(co.class_option_id)}" type="date" value="${esc(co.confirmed_start_date || "")}" />
+            </div>
           </div>
           <div class="form-field" style="margin-bottom:var(--space-3)">
             <label>Fellowship Codes</label>
             <div class="fc-chips" id="efc-${esc(co.class_option_id)}"></div>
           </div>
           <div class="toggle-row" style="margin-bottom:var(--space-3);gap:24px;flex-wrap:wrap">
+            <label class="toggle-row"><label class="toggle"><input type="checkbox" id="eonline-${esc(co.class_option_id)}"${co.is_online === true ? " checked" : ""}/><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Online class</span></label>
             <label class="toggle-row"><label class="toggle"><input type="checkbox" id="eactive-${esc(co.class_option_id)}"${co.active !== false ? " checked" : ""}/><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Active</span></label>
             <label class="toggle-row"><label class="toggle"><input type="checkbox" id="eenroll-${esc(co.class_option_id)}"${co.enrollment_open !== false ? " checked" : ""}/><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Enrollment Open</span></label>
           </div>
           <div style="display:flex;gap:var(--space-2)">
             <button class="btn btn-primary" data-save-edit="${esc(co.class_option_id)}" data-old-day="${esc(co.day || "")}" data-old-time="${esc(co.class_time || "")}">Save Changes</button>
+            ${splitBtn}
             <button class="btn" data-cancel-edit="${esc(co.class_option_id)}">Cancel</button>
           </div>
           <div id="emsg-${esc(co.class_option_id)}" style="margin-top:var(--space-2)"></div>
@@ -278,11 +328,12 @@
       rows.forEach((co) => {
         const slotCount = state.slots[co.class_option_id] || 0;
         const fc        = (co.fellowship_codes || []).join(", ") || "-";
+        const onlineTag = co.is_online === true ? ' <span class="fc-chip" style="font-size:10px;padding:1px 8px">ONLINE</span>' : "";
         html += `<tr id="row-${esc(co.class_option_id)}" style="${co.deleted_at ? "opacity:.5" : ""}">
           <td style="font-size:12px;font-weight:600">${esc(co.class_option_id)}</td>
           <td style="font-size:12px">${esc(co.teacher_name || "-")}</td>
           <td style="font-size:12px">${esc(co.group_id || "-")}</td>
-          <td style="font-size:12px">${esc(fc)}</td>
+          <td style="font-size:12px">${esc(fc)}${onlineTag}</td>
           <td style="font-size:12px">${esc(co.day || "-")}</td>
           <td style="font-size:12px">${esc(co.class_time || "-")}</td>
           <td style="font-size:12px">${co.active === false ? "No" : "Yes"}</td>
@@ -308,7 +359,8 @@
       rows.forEach((co) => {
         if (state.openEditId === co.class_option_id) {
           renderFcChips(`efc-${co.class_option_id}`, state.editFcCodes[co.class_option_id] || [], (updated) => {
-            state.editFcCodes[co.class_option_id] = updated;
+            const isOnline = document.getElementById(`eonline-${co.class_option_id}`)?.checked === true;
+            state.editFcCodes[co.class_option_id] = enforceCodesForOnlineMode(updated, isOnline);
             renderTable();
           });
         }
@@ -351,7 +403,10 @@
         state.batches.map((b) => `<option value="${esc(b.batch_id)}">${esc(b.batch_name || b.batch_id)}</option>`).join("");
 
       renderFcChips("nFcChips", state.newFcCodes, (updated) => {
-        state.newFcCodes = updated;
+        const isOnline = $("nIsOnline")?.checked === true;
+        state.newFcCodes = enforceCodesForOnlineMode(updated, isOnline);
+        const prompt = $("multiFcPrompt");
+        if (prompt) prompt.style.display = (isOnline && state.newFcCodes.length > 1) ? "" : "none";
         renderFcChips("nFcChips", state.newFcCodes, arguments.callee);
       });
 
@@ -367,9 +422,11 @@
       const newTime    = document.getElementById(`etime-${coId}`)?.value;
       const newCap     = document.getElementById(`ecap-${coId}`)?.value || null;
       const newSuffix  = document.getElementById(`esuffix-${coId}`)?.value || null;
+      const newStart   = document.getElementById(`estart-${coId}`)?.value || null;
       const isActive   = document.getElementById(`eactive-${coId}`)?.checked;
       const enrollOpen = document.getElementById(`eenroll-${coId}`)?.checked;
-      const newFc      = state.editFcCodes[coId] || [];
+      const isOnline   = document.getElementById(`eonline-${coId}`)?.checked === true;
+      const newFc      = enforceCodesForOnlineMode(state.editFcCodes[coId] || [], isOnline);
       const now        = new Date().toISOString();
       const actor      = state.profile?.email || null;
       const msgEl      = document.getElementById(`emsg-${coId}`);
@@ -381,8 +438,10 @@
         class_time:       newTime,
         max_capacity:     newCap ? parseInt(newCap) : null,
         label_suffix:     newSuffix,
+        confirmed_start_date: newStart || null,
         active:           isActive,
         enrollment_open:  enrollOpen,
+        is_online:        isOnline,
         fellowship_codes: newFc,
         updated_by:       actor,
         updated_at:       now,
@@ -413,7 +472,7 @@
               recipient_email: ap.email,
               recipient_name:  ap.full_name || "",
               template_key:    "class_time_changed",
-              subject:         "Update: Your Foundation School class time has changed",
+              subject:         "Update: Your Rock Solid class time has changed",
               status:          "Pending",
               payload: {
                 first_name:   String(ap.full_name || "Student").split(/\s+/)[0],
@@ -445,20 +504,21 @@
 
     // ── Create new class ──────────────────────────────────────────────────────
     async function createClass() {
-      const classId   = $("nClassId")?.value.trim();
       const teacherId = $("nTeacher")?.value;
       const day       = $("nDay")?.value;
       const time      = $("nTime")?.value;
       const capacity  = $("nCapacity")?.value ? parseInt($("nCapacity").value) : null;
       const batchId   = $("nBatch")?.value || null;
       const suffix    = $("nSuffix")?.value.trim() || null;
+      const isOnline  = $("nIsOnline")?.checked === true;
       const active    = $("nActive")?.checked;
       const enrollO   = $("nEnrollOpen")?.checked;
-      const fc        = state.newFcCodes;
+      const fc        = enforceCodesForOnlineMode(state.newFcCodes, isOnline);
       const msgEl     = $("newMsg");
+      const classMode = state.newClassMode || "shared";
 
-      if (!classId || !teacherId || !day || !time) {
-        msgEl.innerHTML = '<div class="msg error">Class ID, teacher, day, and time are required.</div>';
+      if (!teacherId || !day || !time) {
+        msgEl.innerHTML = '<div class="msg error">Teacher, day, and time are required.</div>';
         return;
       }
 
@@ -466,53 +526,180 @@
       const now     = new Date().toISOString();
       const actor   = state.profile?.email || null;
 
-      const { error } = await supabase.from("class_options").insert({
-        class_option_id:  classId,
-        teacher_id:       teacherId,
-        teacher_name:     teacher?.full_name || null,
-        day,
-        class_time:       time,
-        max_capacity:     capacity,
-        label_suffix:     suffix,
-        active,
-        enrollment_open:  enrollO,
-        fellowship_codes: fc,
-        group_id:         teacher?.group_id || null,
-        subgroup_id:      teacher?.subgroup_id || null,
-        created_by:       actor,
-        updated_by:       actor,
-        created_at:       now,
-        updated_at:       now,
-      });
-
-      if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
-
-      if (batchId) {
-        await supabase.from("class_slots").insert({
-          class_slot_id:    `${classId}-${batchId}`,
-          class_option_id:  classId,
-          batch_id:         batchId,
+      if (isOnline && fc.length > 1 && classMode === "separate") {
+        const rows = fc.map((code) => ({
+          class_option_id:  generateSeparateClassId(code, teacherId, day, time),
+          teacher_id:       teacherId,
           teacher_name:     teacher?.full_name || null,
+          day,
+          class_time:       time,
+          max_capacity:     capacity,
+          label_suffix:     suffix,
+          active,
+          enrollment_open:  enrollO,
+          is_online:        isOnline,
+          fellowship_codes: [code],
           group_id:         teacher?.group_id || null,
           subgroup_id:      teacher?.subgroup_id || null,
-          status:           "Active",
-          current_enrolment: 0,
-          max_capacity:     capacity,
           created_by:       actor,
           updated_by:       actor,
+          created_at:       now,
+          updated_at:       now,
+        }));
+        const { error } = await supabase.from("class_options").insert(rows);
+        if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+        if (batchId) {
+          const slotRows = rows.map((r) => ({
+            class_slot_id: `${r.class_option_id}-${batchId}`,
+            class_option_id: r.class_option_id,
+            batch_id: batchId,
+            teacher_name: teacher?.full_name || null,
+            group_id: teacher?.group_id || null,
+            subgroup_id: teacher?.subgroup_id || null,
+            status: "Active",
+            current_enrolment: 0,
+            max_capacity: capacity,
+            created_by: actor,
+            updated_by: actor,
+          }));
+          const { error: slotErr } = await supabase.from("class_slots").insert(slotRows);
+          if (slotErr) { msgEl.innerHTML = `<div class="msg error">${esc(slotErr.message)}</div>`; return; }
+        }
+        await supabase.from("audit_logs").insert(rows.map((r) => ({
+          actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option",
+          entity_id: r.class_option_id, status: "SUCCESS",
+          details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId, fellowship_code: r.fellowship_codes[0], mode: "separate" },
+          created_at: now,
+        })));
+        msgEl.innerHTML = `<div class="msg success">${fc.length} separate classes created</div>`;
+      } else {
+        const classId = $("nClassId")?.value.trim() || generateSharedClassId(teacher?.subgroup_id || "SG", teacherId, day, time);
+        const { error } = await supabase.from("class_options").insert({
+          class_option_id:  classId,
+          teacher_id:       teacherId,
+          teacher_name:     teacher?.full_name || null,
+          day,
+          class_time:       time,
+          max_capacity:     capacity,
+          label_suffix:     suffix,
+          active,
+          enrollment_open:  enrollO,
+          is_online:        isOnline,
+          fellowship_codes: fc,
+          group_id:         teacher?.group_id || null,
+          subgroup_id:      teacher?.subgroup_id || null,
+          created_by:       actor,
+          updated_by:       actor,
+          created_at:       now,
+          updated_at:       now,
         });
+        if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+        if (batchId) {
+          const { error: slotErr } = await supabase.from("class_slots").insert({
+            class_slot_id:    `${classId}-${batchId}`,
+            class_option_id:  classId,
+            batch_id:         batchId,
+            teacher_name:     teacher?.full_name || null,
+            group_id:         teacher?.group_id || null,
+            subgroup_id:      teacher?.subgroup_id || null,
+            status:           "Active",
+            current_enrolment: 0,
+            max_capacity:     capacity,
+            created_by:       actor,
+            updated_by:       actor,
+          });
+          if (slotErr) { msgEl.innerHTML = `<div class="msg error">${esc(slotErr.message)}</div>`; return; }
+        }
+        await supabase.from("audit_logs").insert({
+          actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option",
+          entity_id: classId, status: "SUCCESS",
+          details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId, fellowship_codes: fc, mode: "shared" },
+          created_at: now,
+        });
+        msgEl.innerHTML = fc.length > 1
+          ? `<div class="msg success">1 shared class created for ${fc.length} fellowships</div>`
+          : '<div class="msg success">Class created!</div>';
+      }
+      state.newFcCodes = [];
+      $("newPanel").style.display = "none";
+      await loadData();
+    }
+
+    async function splitSharedClass(coId) {
+      const source = state.classes.find((c) => c.class_option_id === coId);
+      if (!source) return;
+      const codes = source.fellowship_codes || [];
+      if (codes.length < 2) return;
+      if (!confirm("This will create separate class IDs per fellowship. Enrolled students will need to be manually reassigned.")) return;
+
+      const actor = state.profile?.email || null;
+      const now = new Date().toISOString();
+      const teacherId = source.teacher_id || "";
+      const day = source.day || "";
+      const time = source.class_time || "";
+
+      const rows = codes.map((code) => ({
+        class_option_id: generateSeparateClassId(code, teacherId, day, time),
+        teacher_id: source.teacher_id,
+        teacher_name: source.teacher_name,
+        day: source.day,
+        class_time: source.class_time,
+        max_capacity: source.max_capacity,
+        label_suffix: source.label_suffix,
+        active: true,
+        enrollment_open: source.enrollment_open !== false,
+        fellowship_codes: [code],
+        group_id: source.group_id,
+        subgroup_id: source.subgroup_id,
+        created_by: actor,
+        updated_by: actor,
+        created_at: now,
+        updated_at: now,
+      }));
+
+      const { error } = await supabase.from("class_options").insert(rows);
+      if (error) { showFlash(`Split failed: ${error.message}`, "error"); return; }
+
+      const { data: sourceSlots } = await supabase.from("class_slots").select("*").eq("class_option_id", coId);
+      if (sourceSlots?.length) {
+        const slotRows = [];
+        for (const row of rows) {
+          for (const s of sourceSlots) {
+            slotRows.push({
+              class_slot_id: `${row.class_option_id}-${s.batch_id}`,
+              class_option_id: row.class_option_id,
+              batch_id: s.batch_id,
+              teacher_name: row.teacher_name,
+              group_id: row.group_id,
+              subgroup_id: row.subgroup_id,
+              status: s.status || "Active",
+              current_enrolment: 0,
+              max_capacity: row.max_capacity,
+              created_by: actor,
+              updated_by: actor,
+            });
+          }
+        }
+        const { error: slotErr } = await supabase.from("class_slots").insert(slotRows);
+        if (slotErr) { showFlash(`Split slot creation failed: ${slotErr.message}`, "error"); return; }
       }
 
+      await supabase.from("class_options")
+        .update({ active: false, enrollment_open: false, updated_by: actor, updated_at: now })
+        .eq("class_option_id", coId);
+
       await supabase.from("audit_logs").insert({
-        actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option",
-        entity_id: classId, status: "SUCCESS",
-        details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId },
+        actor_email: actor,
+        action: "CLASS_OPTION_SPLIT",
+        entity_type: "class_option",
+        entity_id: coId,
+        status: "SUCCESS",
+        details: { source_class_option_id: coId, fellowship_codes: codes, new_class_option_ids: rows.map((r) => r.class_option_id) },
         created_at: now,
       });
 
-      msgEl.innerHTML = '<div class="msg success">Class created!</div>';
-      state.newFcCodes = [];
-      $("newPanel").style.display = "none";
+      showFlash(`${codes.length} separate classes created`, "success");
+      state.openEditId = null;
       await loadData();
     }
 
@@ -534,7 +721,28 @@
           const t = $("nTeacher")?.value;
           const d = $("nDay")?.value;
           const ti = $("nTime")?.value;
-          $("nClassId").value = generateClassId(t, d, ti);
+          const teacher = state.teachers.find((x) => x.teacher_id === t);
+          $("nClassId").value = generateSharedClassId(teacher?.subgroup_id || "SG", t, d, ti);
+        });
+      });
+
+      document.querySelectorAll('input[name="multiFcMode"]').forEach((el) => {
+        el.addEventListener("change", () => {
+          state.newClassMode = el.value === "separate" ? "separate" : "shared";
+        });
+      });
+
+      $("nIsOnline")?.addEventListener("change", () => {
+        const isOnline = $("nIsOnline")?.checked === true;
+        state.newFcCodes = enforceCodesForOnlineMode(state.newFcCodes, isOnline);
+        const prompt = $("multiFcPrompt");
+        if (prompt) prompt.style.display = (isOnline && state.newFcCodes.length > 1) ? "" : "none";
+        renderFcChips("nFcChips", state.newFcCodes, (updated) => {
+          const online = $("nIsOnline")?.checked === true;
+          state.newFcCodes = enforceCodesForOnlineMode(updated, online);
+          const p = $("multiFcPrompt");
+          if (p) p.style.display = (online && state.newFcCodes.length > 1) ? "" : "none";
+          renderFcChips("nFcChips", state.newFcCodes, arguments.callee);
         });
       });
 
@@ -554,6 +762,12 @@
         const saveBtn = e.target.closest("[data-save-edit]");
         if (saveBtn) {
           await saveEdit(saveBtn.dataset.saveEdit, saveBtn.dataset.oldDay, saveBtn.dataset.oldTime);
+          return;
+        }
+
+        const splitBtn = e.target.closest("[data-split-class]");
+        if (splitBtn) {
+          await splitSharedClass(splitBtn.dataset.splitClass);
           return;
         }
 
@@ -588,6 +802,15 @@
           return;
         }
       });
+
+      $("classTableBody").addEventListener("change", (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLInputElement)) return;
+        if (!el.id.startsWith("eonline-")) return;
+        const coId = el.id.replace("eonline-", "");
+        state.editFcCodes[coId] = enforceCodesForOnlineMode(state.editFcCodes[coId] || [], el.checked);
+        renderTable();
+      });
     }
 
     async function boot() {
@@ -600,6 +823,7 @@
       if (!auth) return;
       state.profile = auth.profile;
       state.canEdit = ["admin","superadmin"].includes((auth.profile?.role || "").toLowerCase());
+      state.canSuperadmin = (auth.profile?.role || "").toLowerCase() === "superadmin";
 
       window.FSAdminShell?.mount({ active: "classeditor", pageTitle: "Class Editor", role: auth.profile?.role });
 
@@ -616,3 +840,4 @@
   </script>
 </body>
 </html>
+

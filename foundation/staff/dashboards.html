@@ -41,7 +41,7 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .06em;
-      color: var(--color-text-muted, var(--muted));
+      color: var(--color-text-muted, var(--color-text-muted));
     }
     .kpi-card.kpi-warn .kpi-value  { color: #c07400; }
     .kpi-card.kpi-danger .kpi-value { color: #b53030; }
@@ -77,8 +77,8 @@
       padding: 14px;
       border: 1px solid var(--color-border, var(--border));
       border-radius: 12px;
-      background: var(--color-surface, var(--surface));
-      color: var(--color-text-muted, var(--muted));
+      background: var(--color-surface, var(--color-surface));
+      color: var(--color-text-muted, var(--color-text-muted));
       font-size: 13px;
     }
     .hidden { display: none !important; }
@@ -88,7 +88,7 @@
     table.fs-table { width: 100%; min-width: 560px; border-collapse: collapse; }
     table.fs-table th,
     table.fs-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border, var(--border)); text-align: left; font-size: 13px; }
-    table.fs-table th { font-size: 11px; text-transform: uppercase; color: var(--color-text-muted, var(--muted)); letter-spacing: .05em; font-weight: 700; }
+    table.fs-table th { font-size: 11px; text-transform: uppercase; color: var(--color-text-muted, var(--color-text-muted)); letter-spacing: .05em; font-weight: 700; }
     table.fs-table tr:last-child td { border-bottom: none; }
 
     @media (max-width: 900px) {
@@ -105,7 +105,7 @@
   <main class="fs-page">
     <section class="hero" style="margin-bottom:16px;">
       <h1 style="margin:0;font-size:clamp(1.4rem,3vw,2rem);font-weight:800;">Operational Dashboards</h1>
-      <p style="margin:4px 0 0;color:var(--color-text-muted,var(--muted));">Live registration and delivery summary.</p>
+      <p style="margin:4px 0 0;color:var(--color-text-muted,var(--color-text-muted));">Live registration and delivery summary.</p>
     </section>
 
     <!-- Scope banner -->
@@ -121,7 +121,7 @@
           <option value="">All Batches</option>
         </select>
         <button id="refreshBtn" class="fs-btn fs-btn-primary fs-btn-sm">Refresh</button>
-        <span id="lastRefreshed" style="margin-left:auto;font-size:12px;color:var(--color-text-muted,var(--muted));"></span>
+        <span id="lastRefreshed" style="margin-left:auto;font-size:12px;color:var(--color-text-muted,var(--color-text-muted));"></span>
       </div>
     </section>
 
@@ -142,11 +142,19 @@
         <div class="kpi-value" id="kpiWaitlisted">—</div>
         <div class="kpi-label">Waitlisted</div>
       </article>
+      <article class="kpi-card fs-metric" title="Teachers currently certified and active for this quarter">
+        <div class="kpi-value fs-metric-value" id="kpiActiveCertifiedTeachers">-</div>
+        <div class="kpi-label fs-metric-label">Active/Certified Teachers</div>
+      </article>
+      <article class="kpi-card fs-metric" title="Teachers assigned to at least one active class in the current batch">
+        <div class="kpi-value fs-metric-value" id="kpiCurrentlyTeaching">-</div>
+        <div class="kpi-label fs-metric-label">Currently Teaching</div>
+      </article>
       <article class="kpi-card kpi-warn">
         <div class="kpi-value" id="kpiStale">—</div>
         <div class="kpi-label">Stale Reviews (&gt;48 h)</div>
       </article>
-      <article class="kpi-card kpi-danger">
+      <article id="failedSyncKpiCard" class="kpi-card kpi-danger">
         <div class="kpi-value" id="kpiFailedSyncs">—</div>
         <div class="kpi-label">Failed Syncs</div>
       </article>
@@ -188,7 +196,7 @@
           <thead>
             <tr>
               <th>Day</th><th>Time</th><th>Fellowship</th>
-              <th>Enrolled</th><th>Max</th><th style="min-width:100px;">Fill</th>
+              <th>Reg / Applied</th><th>Max</th><th style="min-width:100px;">Fill</th>
             </tr>
           </thead>
           <tbody id="capacityRows"></tbody>
@@ -197,7 +205,7 @@
     </section>
 
     <!-- Row 5: failed syncs + escalation -->
-    <div class="ops-row">
+    <div id="systemOpsRow" class="ops-row">
       <section class="card ops-card">
         <h4>Failed Syncs</h4>
         <div id="failedSyncState" class="state">Loading…</div>
@@ -208,7 +216,7 @@
         <h4>Escalation Tasks</h4>
         <div id="escalationState" class="state">Loading…</div>
         <div id="escalationList" class="hidden"></div>
-        <p style="font-size:11px;color:var(--color-text-muted,var(--muted));margin-top:10px;">
+        <p style="font-size:11px;color:var(--color-text-muted,var(--color-text-muted));margin-top:10px;">
           Tasks raised by the system. Resolve in ClickUp directly.
         </p>
       </section>
@@ -234,7 +242,7 @@
     <!-- Migration notes -->
     <section class="card">
       <h3 style="margin:0 0 10px;font-size:14px;font-weight:800;">Migration Notes</h3>
-      <ul id="migrationNotes" style="margin:0 0 0 18px;color:var(--color-text-muted,var(--muted));font-size:13px;"></ul>
+      <ul id="migrationNotes" style="margin:0 0 0 18px;color:var(--color-text-muted,var(--color-text-muted));font-size:13px;"></ul>
     </section>
   </main>
 
@@ -243,7 +251,7 @@
           crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
 
   <script type="module">
     import { supabase, getCurrentProfile, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
@@ -292,7 +300,7 @@
       const p = Math.min(Number(pct) || 0, 100);
       const cls = p >= 90 ? "fill-danger" : p >= 75 ? "fill-warn" : "";
       return `<div class="fill-bar-track"><div class="fill-bar-fill ${cls}" style="width:${p}%;"></div></div>
-              <span style="font-size:11px;color:var(--color-text-muted,var(--muted));">${p}%</span>`;
+              <span style="font-size:11px;color:var(--color-text-muted,var(--color-text-muted));">${p}%</span>`;
     }
 
     function destroyChart(key) {
@@ -330,6 +338,12 @@
       }
 
       return { profile, subgroups };
+    }
+
+    function applyRegionalView(role) {
+      if (!isRegionalSecretary(role)) return;
+      $("failedSyncKpiCard")?.classList.add("hidden");
+      $("systemOpsRow")?.classList.add("hidden");
     }
 
     // ── Batch filter ─────────────────────────────────────────────────────────
@@ -495,7 +509,7 @@
           <td>${r.day || "—"}</td>
           <td>${r.class_time || "—"}</td>
           <td>${r.fellowship || "—"}</td>
-          <td>${Number(r.enrolled_count).toLocaleString()}</td>
+          <td>${Number(r.enrolled_count).toLocaleString()} / ${Number(r.applicant_count ?? 0).toLocaleString()}</td>
           <td>${r.max_capacity > 0 ? r.max_capacity : "—"}</td>
           <td>${r.max_capacity > 0 ? fillBarHtml(r.pct) : "—"}</td>
         </tr>
@@ -515,6 +529,33 @@
         show("staleQueueBanner");
       } else {
         hide("staleQueueBanner");
+      }
+    }
+
+    async function loadTeacherKpis() {
+      const activeEl = $("kpiActiveCertifiedTeachers");
+      const teachingEl = $("kpiCurrentlyTeaching");
+      if (activeEl) activeEl.textContent = "-";
+      if (teachingEl) teachingEl.textContent = "-";
+
+      try {
+        const { data, error } = await supabase.rpc("get_active_teacher_count");
+        if (error) throw error;
+        const count = Number(data?.[0]?.active_certified || 0);
+        if (activeEl) activeEl.textContent = count.toLocaleString();
+      } catch (_) {
+        if (activeEl) activeEl.textContent = "?";
+      }
+
+      try {
+        const { data, error } = await supabase.rpc("get_currently_teaching_count", {
+          p_batch_id: _batchId || null,
+        });
+        if (error) throw error;
+        const count = Number(data?.[0]?.currently_teaching || 0);
+        if (teachingEl) teachingEl.textContent = count.toLocaleString();
+      } catch (_) {
+        if (teachingEl) teachingEl.textContent = "?";
       }
     }
 
@@ -550,16 +591,17 @@
       show("failedSyncList");
     }
 
-    // ── Widget: Escalation Summary ───────────────────────────────────────────
+    // ── Widget: Escalation Details ───────────────────────────────────────────
     async function loadEscalationSummary() {
       setState("escalationState", "Loading…");
       hide("escalationList");
 
-      const { data, error } = await supabase.rpc("get_escalation_summary", {
+      const { data, error } = await supabase.rpc("get_escalation_details", {
         p_subgroups: _scope.subgroups || null,
+        p_limit: 50,
       });
       if (error) {
-        if (isMissingTable(error)) missingItems.add("get_escalation_summary RPC");
+        if (isMissingTable(error)) missingItems.add("get_escalation_details RPC");
         setState("escalationState", error.message || "Could not load escalation data.");
         return;
       }
@@ -567,16 +609,33 @@
       const rows = data || [];
       if (!rows.length) { setState("escalationState", "No escalation tasks on record."); return; }
 
-      const statusCls = { CREATED: "fs-badge-warning", PENDING: "fs-badge-info", FAILED: "fs-badge-danger" };
+      const statusCls = { CREATED: "fs-badge-warning", PENDING: "fs-badge-info", FAILED: "fs-badge-danger", DONE: "fs-badge-success" };
+      const typeLabel = (t) => {
+        if (t === "missed_class") return "Missed Class";
+        if (t === "escalation:applicants") return "Applicant";
+        if (t === "escalation:moodle_enrollment_sync") return "Moodle Sync";
+        return t || "—";
+      };
       $("escalationList").innerHTML = `
-        <table class="fs-table">
-          <thead><tr><th>Type</th><th>Status</th><th>Count</th></tr></thead>
+        <table class="fs-table" style="min-width:700px;">
+          <thead><tr>
+            <th>Type</th><th>Person</th><th>Class</th>
+            <th>Status</th><th>ClickUp Task</th><th>Error</th><th>Created</th>
+          </tr></thead>
           <tbody>${rows.map((r) => {
             const cls = statusCls[r.task_status] || "fs-badge-neutral";
+            const taskLink = r.clickup_task_id
+              ? `<a href="https://app.clickup.com/t/${r.clickup_task_id}" target="_blank" rel="noopener" style="font-size:11px;">${r.clickup_task_id}</a>`
+              : "—";
+            const person = [r.person_name, r.person_email ? `<span style="color:var(--color-text-muted);font-size:11px;">${r.person_email}</span>` : ""].filter(Boolean).join("<br>");
             return `<tr>
-              <td>${r.source_type}</td>
+              <td style="white-space:nowrap;">${typeLabel(r.source_type)}</td>
+              <td>${person || "—"}</td>
+              <td style="font-size:12px;">${r.class_info || "—"}</td>
               <td><span class="fs-badge ${cls}">${r.task_status}</span></td>
-              <td>${Number(r.cnt).toLocaleString()}</td>
+              <td>${taskLink}</td>
+              <td style="font-size:11px;color:var(--color-text-muted);max-width:180px;word-break:break-word;">${r.error_message || "—"}</td>
+              <td style="white-space:nowrap;font-size:12px;">${fmtDate(r.created_at)}</td>
             </tr>`;
           }).join("")}</tbody>
         </table>`;
@@ -605,7 +664,7 @@
           <td>${fmtTime(findAny(row, ["created_at","submitted_at"]))}</td>
           <td>${findAny(row, ["full_name","name","applicant_name"])}</td>
           <td>${findAny(row, ["email","email_address"])}</td>
-          <td>${findAny(row, ["fellowship_code","fellowship","group_id"])}</td>
+          <td>${findAny(row, ["fellowship_code","fellowship","group_id"])}${findAny(row, ["subgroup_id"]) ? ` <span style="color:var(--color-text-muted)">/ ${findAny(row, ["subgroup_id"])}</span>` : ""}</td>
           <td>${findAny(row, ["batch_id","batch_name"])}</td>
           <td>${statusBadge(findAny(row, ["registration_status","status"]))}</td>
           <td>${findAny(row, ["availability_status","availability_outcome"])}</td>
@@ -634,8 +693,9 @@
         loadWeeklyTrend(),
         loadCapacity(),
         loadStaleQueue(),
-        loadFailedSyncs(),
-        loadEscalationSummary(),
+        loadTeacherKpis(),
+        isRegionalSecretary(_scope.profile?.role) ? Promise.resolve() : loadFailedSyncs(),
+        isRegionalSecretary(_scope.profile?.role) ? Promise.resolve() : loadEscalationSummary(),
         loadRecent(),
       ]);
       renderMigrationNotes();
@@ -646,13 +706,14 @@
     async function init() {
       _scope = await resolveScope();
       if (!_scope) return;
+      applyRegionalView(_scope.profile.role);
 
       window.FSAdminShell?.mount({
         active: "dashboard",
         title: "Rock Solid Admin",
         profileName: _scope.profile.full_name || _scope.profile.email || "Admin",
         role: _scope.profile.role,
-        breadcrumbs: [{ label: "Admin", href: "admin-dashboard.html" }, "Dashboards"],
+        breadcrumbs: [{ label: "Admin", href: "dashboards.html" }, "Dashboards"],
       });
 
       await loadBatchOptions();

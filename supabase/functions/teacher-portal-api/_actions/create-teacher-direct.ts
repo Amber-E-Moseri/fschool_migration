@@ -158,7 +158,7 @@ export async function createTeacherDirectAction(ctx: ActionContext): Promise<Res
   try {
     const linkRes = await withTimeout(
       db.rpc("link_teacher_to_auth_user", {
-        p_teacher_email: email,
+        p_teacher_id: teacherId,
         p_auth_user_id: authUserId,
         p_actor_email: actorEmail,
       }),
@@ -166,6 +166,8 @@ export async function createTeacherDirectAction(ctx: ActionContext): Promise<Res
     );
     if (linkRes.error) {
       console.warn("[createTeacherDirect] link_teacher_to_auth_user failed", linkRes.error.message);
+    } else if (linkRes.data?.ok === false) {
+      console.warn("[createTeacherDirect] link_teacher_to_auth_user rejected", linkRes.data?.error || "Unknown error payload");
     }
   } catch (err) {
     console.warn("[createTeacherDirect] link_teacher_to_auth_user failed", err);

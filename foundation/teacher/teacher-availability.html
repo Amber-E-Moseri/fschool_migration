@@ -10,23 +10,14 @@
 </head>
 <body>
   <main class="fs-content" style="max-width:1200px;margin:0 auto;padding:16px;">
-    <section class="fs-card" style="margin-bottom:12px;">
-      <div class="fs-row" style="justify-content:space-between;align-items:center;">
-        <div>
-          <h1 class="fs-h1">Teacher Availability</h1>
-          <p class="fs-muted">Submit weekly availability by fellowship and month.</p>
-        </div>
-        <button id="logoutBtn" class="fs-btn fs-btn-secondary" type="button">Logout</button>
-      </div>
-    </section>
     <div id="main-content"></div>
   </main>
 
   <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
+  <script src="../js/teacher-shell.js"></script>
   <script type="module">
     import { CONFIG, requireAuth } from "../auth/auth-client.js";
-    import { logout } from "../auth/logout.js";
     import { mountTeacherAvailability } from "../js/teacher-availability-module.js";
 
     document.documentElement.setAttribute("data-theme", "light");
@@ -38,7 +29,7 @@
       }
       const auth = await requireAuth(["teacher", "principal", "admin", "superadmin"]);
       if (!auth) return;
-      document.getElementById("logoutBtn").addEventListener("click", logout);
+      window.FSTeacherShell?.mount({ active: "availability" });
       await mountTeacherAvailability("main-content");
     }
 

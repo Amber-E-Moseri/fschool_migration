@@ -97,7 +97,7 @@
   </main>
 
   <script src="../js/config.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, requireAuth, isRegionalSecretary } from "../auth/auth-client.js";
 
@@ -270,8 +270,8 @@
         const firstName = String(stu?.full_name || email).split(/\s+/)[0];
         const templateKey = scenario === "dropped_off" ? "engagement_dropped_off" : "engagement_never_started";
         const subject = scenario === "dropped_off"
-          ? `We miss you at Foundation School — ${firstName}`
-          : `We saved your spot at Foundation School — ${firstName}`;
+          ? `We miss you at Rock Solid — ${firstName}`
+          : `We saved your spot at Rock Solid — ${firstName}`;
         const { error } = await supabase.from("email_queue").insert({
           recipient_email: email,
           recipient_name: stu?.full_name || "",
@@ -387,3 +387,4 @@
   </script>
 </body>
 </html>
+

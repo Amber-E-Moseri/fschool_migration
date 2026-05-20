@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -9,14 +9,14 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../ui/premium-theme.css" />
   <link rel="stylesheet" href="../ui/admin-shell.css" />
-  <link rel='stylesheet' href='../ui/primitives.css' />
   <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
   <link rel="stylesheet" href="../ui/layout.css" />
   <style>
     :root {
       --bg-grad: radial-gradient(1200px 600px at -8% -20%, rgba(140, 113, 255, 0.24), transparent 52%), radial-gradient(900px 500px at 102% 0%, rgba(214, 191, 255, 0.28), transparent 44%), linear-gradient(180deg, color-mix(in srgb, var(--bg) 96%, #fff) 0%, var(--bg) 100%);
-      --shell: color-mix(in srgb, var(--surface) 88%, transparent);
-      --glass: color-mix(in srgb, var(--surface) 74%, transparent);
+      --shell: color-mix(in srgb, var(--color-surface) 88%, transparent);
+      --glass: color-mix(in srgb, var(--color-surface) 74%, transparent);
       --line: color-mix(in srgb, var(--border) 86%, transparent);
       --line-soft: color-mix(in srgb, var(--border) 56%, transparent);
       --shadow-lg: 0 22px 56px rgba(26, 20, 43, 0.16);
@@ -49,7 +49,7 @@
       backdrop-filter: blur(14px);
     }
     .title h2 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
-    .title p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .title p { margin: 3px 0 0; color: var(--color-text-muted); font-size: 12px; }
     .searchbox input, .filter-row select, .filter-row input, .modal-grid select, .modal-grid input {
       width: 100%; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--surface-2);
       color: var(--text); font: inherit; padding: 10px 12px;
@@ -70,40 +70,40 @@
     .icon-btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--primary) 25%, var(--line-soft)); }
     .kpi-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
     .card {
-      background: color-mix(in srgb, var(--surface) 96%, white 4%);
+      background: color-mix(in srgb, var(--color-surface) 96%, white 4%);
       border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 14px;
     }
-    .kpi-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .kpi-label { color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
     .kpi-value { margin-top: 8px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
-    .kpi-sub { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .kpi-sub { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; }
     .filter-row { margin-top: 2px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; align-items: center; }
     .table-card { margin-top: 12px; }
     .table-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
     .table-top h3 { margin: 0; font-size: 17px; }
-    .table-top p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
-    .table-wrap { overflow: auto; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface); }
+    .table-top p { margin: 3px 0 0; color: var(--color-text-muted); font-size: 12px; }
+    .table-wrap { overflow: auto; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--color-surface); }
     table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1280px; }
     th, td {
       padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; background: transparent;
     }
     th {
-      font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+      font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted);
       background: color-mix(in srgb, var(--surface-2) 92%, white 8%); position: sticky; top: 0; z-index: 1;
     }
     tbody tr { transition: transform .14s ease, box-shadow .14s ease; }
     tbody tr:hover { transform: translateY(-1px); }
-    tbody tr:hover td { background: color-mix(in srgb, var(--soft-lavender) 54%, var(--surface)); }
+    tbody tr:hover td { background: color-mix(in srgb, var(--soft-lavender) 54%, var(--color-surface)); }
     .student-cell .name { font-weight: 700; }
-    .student-cell .sub { font-size: 12px; color: var(--muted); }
+    .student-cell .sub { font-size: 12px; color: var(--color-text-muted); }
     .pill {
       border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; display: inline-flex;
       align-items: center; gap: 4px; border: 1px solid transparent; white-space: nowrap;
     }
-    .assigned { color: var(--pill-assigned); background: color-mix(in srgb, var(--pill-assigned) 14%, var(--surface)); border-color: color-mix(in srgb, var(--pill-assigned) 35%, var(--surface)); }
-    .attention { color: var(--pill-attention); background: color-mix(in srgb, var(--pill-attention) 16%, var(--surface)); border-color: color-mix(in srgb, var(--pill-attention) 42%, var(--surface)); }
-    .duplicate { color: var(--pill-duplicate); background: color-mix(in srgb, var(--pill-duplicate) 12%, var(--surface)); border-color: color-mix(in srgb, var(--pill-duplicate) 34%, var(--surface)); }
-    .completed { color: var(--pill-completed); background: color-mix(in srgb, var(--pill-completed) 14%, var(--surface)); border-color: color-mix(in srgb, var(--pill-completed) 35%, var(--surface)); }
-    .unassigned { color: var(--pill-unassigned); background: color-mix(in srgb, var(--pill-unassigned) 12%, var(--surface)); border-color: color-mix(in srgb, var(--pill-unassigned) 30%, var(--surface)); }
+    .assigned { color: var(--pill-assigned); background: color-mix(in srgb, var(--pill-assigned) 14%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-assigned) 35%, var(--color-surface)); }
+    .attention { color: var(--pill-attention); background: color-mix(in srgb, var(--pill-attention) 16%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-attention) 42%, var(--color-surface)); }
+    .duplicate { color: var(--pill-duplicate); background: color-mix(in srgb, var(--pill-duplicate) 12%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-duplicate) 34%, var(--color-surface)); }
+    .completed { color: var(--pill-completed); background: color-mix(in srgb, var(--pill-completed) 14%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-completed) 35%, var(--color-surface)); }
+    .unassigned { color: var(--pill-unassigned); background: color-mix(in srgb, var(--pill-unassigned) 12%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-unassigned) 30%, var(--color-surface)); }
     .btns { display: flex; flex-wrap: wrap; gap: 6px; }
     .btn {
       border-radius: 10px; border: 1px solid var(--line-soft); background: var(--surface-2); color: var(--text);
@@ -113,7 +113,7 @@
     .btn.primary { background: var(--primary); color: #fff; border-color: color-mix(in srgb, var(--primary) 86%, black); }
     .drawer {
       position: fixed; right: 0; top: 0; bottom: 0; width: min(580px, 100%); transform: translateX(100%);
-      transition: transform .22s ease; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg);
+      transition: transform .22s ease; background: var(--color-surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg);
       z-index: 60; display: flex; flex-direction: column;
     }
     .drawer.open { transform: translateX(0); }
@@ -123,7 +123,7 @@
     .kv div {
       background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0;
     }
-    .kv label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .kv label { display: block; font-size: 11px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .05em; }
     .kv strong { font-size: 13px; display: block; margin-top: 3px; word-break: break-word; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip {
@@ -137,7 +137,7 @@
       display: flex; justify-content: space-between; gap: 8px; align-items: center;
     }
     .list .row:last-child { border-bottom: 0; }
-    .muted { color: var(--muted); }
+    .muted { color: var(--color-text-muted); }
     .overlay {
       position: fixed; inset: 0; background: rgba(11, 8, 19, 0.42); backdrop-filter: blur(3px); z-index: 55;
       opacity: 0; pointer-events: none; transition: opacity .2s;
@@ -146,27 +146,27 @@
     .modal { position: fixed; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center; padding: 14px; }
     .modal.open { display: flex; }
     .modal-card {
-      width: min(700px, 100%); max-height: 92vh; overflow: auto; background: var(--surface);
+      width: min(700px, 100%); max-height: 92vh; overflow: auto; background: var(--color-surface);
       border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-lg); padding: 14px; display: grid; gap: 10px;
     }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .warn {
-      border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--surface));
-      background: color-mix(in srgb, #f59e0b 14%, var(--surface)); color: #854d0e;
+      border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--color-surface));
+      background: color-mix(in srgb, #f59e0b 14%, var(--color-surface)); color: #854d0e;
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .err {
-      border: 1px solid color-mix(in srgb, #ef4444 38%, var(--surface));
-      background: color-mix(in srgb, #ef4444 15%, var(--surface)); color: #b42318;
+      border: 1px solid color-mix(in srgb, #ef4444 38%, var(--color-surface));
+      background: color-mix(in srgb, #ef4444 15%, var(--color-surface)); color: #b42318;
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .success {
-      border: 1px solid color-mix(in srgb, #22c55e 35%, var(--surface));
-      background: color-mix(in srgb, #22c55e 14%, var(--surface)); color: #166534;
+      border: 1px solid color-mix(in srgb, #22c55e 35%, var(--color-surface));
+      background: color-mix(in srgb, #22c55e 14%, var(--color-surface)); color: #166534;
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .mobile-cards { display: none; gap: 10px; }
-    .mobile-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
+    .mobile-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--color-surface); box-shadow: var(--shadow-sm); }
     .sticky-mobile { position: sticky; bottom: 8px; z-index: 10; margin-top: 8px; display: none; }
     @media (max-width: 1260px) {
       .page-toolbar { grid-template-columns: 1fr; }
@@ -200,7 +200,7 @@
           <select id="quickNotif"><option value="">All Notification</option><option value="SENT">Sent</option><option value="PENDING">Pending</option><option value="FAILED">Failed</option><option value="RETRIED">Retried</option></select>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="icon-btn" id="refreshBtnTop" title="Refresh" aria-label="Refresh">↻</button>
+          <button class="icon-btn" id="refreshBtnTop" title="Refresh" aria-label="Refresh">?</button>
         </div>
       </section>
 
@@ -216,22 +216,22 @@
           <select id="statusFilter"><option value="">All Status</option></select>
           <input id="dateFilter" type="date" />
           <button class="btn fs-btn fs-btn-secondary" id="clearFilters">Clear Filters</button>
-          <button class="btn fs-btn fs-btn-secondary" id="toggleAdvFilters">Advanced ▾ <span id="advFilterBadge" style="display:none;background:var(--primary);color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:4px"></span></button>
+          <button class="btn fs-btn fs-btn-secondary" id="toggleAdvFilters">Advanced ? <span id="advFilterBadge" style="display:none;background:var(--primary);color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:4px"></span></button>
         </div>
       </section>
 
       <section class="card" id="advFilterPanel" style="display:none;margin-top:-2px">
         <div style="font-size:13px;font-weight:700;margin-bottom:10px">Advanced Filters</div>
         <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
-          <div class="field"><label for="afDateFrom" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Registered From</label><input id="afDateFrom" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
-          <div class="field"><label for="afDateTo" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Registered To</label><input id="afDateTo" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
-          <div class="field"><label for="afMoodle" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Moodle Account</label>
+          <div class="field"><label for="afDateFrom" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Registered From</label><input id="afDateFrom" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
+          <div class="field"><label for="afDateTo" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Registered To</label><input id="afDateTo" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
+          <div class="field"><label for="afMoodle" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Moodle Account</label>
             <select id="afMoodle" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px">
               <option value="">Any</option><option value="yes">Has Moodle account</option>
               <option value="no">No Moodle account</option><option value="synced">Synced</option><option value="failed">Sync failed</option>
             </select>
           </div>
-          <div class="field"><label for="afAttStatus" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Attendance Status</label>
+          <div class="field"><label for="afAttStatus" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Attendance Status</label>
             <select id="afAttStatus" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px">
               <option value="">Any</option><option value="never">Never Attended</option>
               <option value="active">Active (75%+)</option><option value="atrisk">At Risk (&lt;75%)</option>
@@ -242,7 +242,7 @@
           <button class="btn fs-btn fs-btn-primary primary" id="afApplyBtn">Apply Filters</button>
           <button class="btn fs-btn fs-btn-secondary" id="afResetBtn">Reset</button>
           <button class="btn fs-btn fs-btn-secondary" id="afSaveBtn">Save Preset</button>
-          <select id="afPresetSelect" style="border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 12px;min-width:140px"><option value="">Load preset…</option></select>
+          <select id="afPresetSelect" style="border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 12px;min-width:140px"><option value="">Load preset�</option></select>
         </div>
       </section>
 
@@ -255,18 +255,18 @@
           <button class="btn fs-btn fs-btn-secondary" id="refreshBtn">Refresh</button>
         </div>
         <div id="flashArea"></div>
-        <div id="bulkBar" style="display:none;padding:10px 14px;background:color-mix(in srgb,var(--primary) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--primary) 30%,var(--line));border-radius:var(--radius-lg);margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div id="bulkBar" style="display:none;padding:10px 14px;background:color-mix(in srgb,var(--primary) 10%,var(--color-surface));border:1px solid color-mix(in srgb,var(--primary) 30%,var(--line));border-radius:var(--radius-lg);margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span id="bulkCount" style="font-weight:800;font-size:13px;white-space:nowrap;color:var(--primary)">0 selected</span>
           <select id="bulkStatusSelect" style="border-radius:10px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 10px">
-            <option value="">Change Status…</option>
+            <option value="">Change Status�</option>
             <option value="PENDING">PENDING</option><option value="ASSIGNED">ASSIGNED</option>
             <option value="WAITLISTED">WAITLISTED</option><option value="REVIEW">REVIEW</option><option value="INACTIVE">INACTIVE</option>
           </select>
-          <select id="bulkClassSelect" style="border-radius:10px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 10px;min-width:160px"><option value="">Change Class…</option></select>
+          <select id="bulkClassSelect" style="border-radius:10px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 10px;min-width:160px"><option value="">Change Class�</option></select>
           <button class="btn fs-btn fs-btn-secondary" id="bulkEmailBtn">Send Email</button>
           <button class="btn fs-btn fs-btn-secondary" id="bulkExportBtn">Export CSV</button>
-          <button class="btn fs-btn fs-btn-secondary" id="bulkClearBtn">✕ Clear</button>
-          <div id="bulkProgress" style="display:none;font-size:12px;color:var(--muted)"></div>
+          <button class="btn fs-btn fs-btn-secondary" id="bulkClearBtn">? Clear</button>
+          <div id="bulkProgress" style="display:none;font-size:12px;color:var(--color-text-muted)"></div>
         </div>
         <div class="table-wrap fs-table-wrap" id="tableWrap"></div>
         <div class="mobile-cards" id="mobileCards"></div>
@@ -288,13 +288,14 @@
       <div class="btns">
         <button class="btn fs-btn fs-btn-primary primary" id="changeClassBtn">Change Class</button>
         <button class="btn fs-btn fs-btn-secondary" id="needsFollowUpBtn">Mark Needs Follow-up</button>
+        <button class="btn fs-btn fs-btn-secondary" id="sendEmailBtn">Send Email</button>
         <button class="btn fs-btn fs-btn-secondary" id="openAttendanceBtn">Open Attendance</button>
         <button class="btn fs-btn fs-btn-secondary" id="openMilestonesBtn">Open Milestones</button>
         <button class="btn fs-btn fs-btn-secondary" id="retryNotificationBtn">Retry Notification</button>
         <button class="btn fs-btn fs-btn-secondary" id="openClickupBtn">Open ClickUp Task</button>
       </div>
       <section class="card" style="margin:0"><div class="kv" id="overviewKv"></div></section>
-      <section class="card" style="margin:0"><strong>Milestones</strong><div class="chip fs-badges" id="milestoneChips"></div></section>
+      <section class="card" style="margin:0"><strong>Milestones</strong><div class="fs-badge fs-badges" id="milestoneChips"></div></section>
       <section class="card" style="margin:0"><strong>Attendance Summary</strong><div class="kv" id="attendanceKv"></div></section>
       <section class="card" style="margin:0"><strong>Notification History</strong><div id="notificationHistory" class="list"></div></section>
       <section class="card" style="margin:0"><strong>Email History</strong><div id="emailHistory" class="list"></div></section>
@@ -303,7 +304,7 @@
         <strong>Status Override</strong>
         <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;align-items:end">
           <select id="statusOverrideSelect" style="border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;">
-            <option value="">— pick status —</option>
+            <option value="">� pick status �</option>
             <option value="PENDING">PENDING</option>
             <option value="WAITLISTED">WAITLISTED</option>
             <option value="REVIEW">REVIEW</option>
@@ -342,7 +343,7 @@
       <div id="modalWarnings"></div>
       <div class="field" style="grid-column:1/-1">
         <label for="correctionReason">Reason for Change <span style="color:#b42318">*</span></label>
-        <textarea id="correctionReason" rows="3" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;resize:vertical;min-height:64px;transition:border-color .16s ease,box-shadow .16s ease;" placeholder="Explain why the class is being changed (min 10 characters)…"></textarea>
+        <textarea id="correctionReason" rows="3" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;resize:vertical;min-height:64px;transition:border-color .16s ease,box-shadow .16s ease;" placeholder="Explain why the class is being changed (min 10 characters)�"></textarea>
       </div>
       <div class="warn">Safety: if class is full this update is blocked. This flow queues a <code>class_reassignment_notice</code> email and resets Moodle sync.</div>
       <div class="btns" style="justify-content:flex-end">
@@ -353,10 +354,14 @@
   </div>
 
 <script src="../js/config.js"></script>
-<script src="../js/admin-shell.js"></script>
+<script src="../js/admin-shell.js?v=20260518"></script>
+<script src="../js/direct-email-modal.js"></script>
 <script type="module" src="../js/applicant-directory.js"></script>
 </body>
 </html>
+
+
+
 
 
 

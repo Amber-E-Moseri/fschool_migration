@@ -15,7 +15,6 @@ interface EmailQueueRow {
   recipient_name: string | null
   student_id: string | null
   subject: string | null
-  body_html: string | null
   status: string
   payload: Record<string, unknown>
 }
@@ -24,12 +23,18 @@ interface EmailTemplate {
   template_key: string
   subject: string
   body_html: string | null
+  active?: boolean
 }
 
 interface RunResult {
   sent: number
   failed: number
   errors: string[]
+}
+
+function isMissingRelationError(error: unknown): boolean {
+  const msg = String((error as { message?: string } | null)?.message || "").toLowerCase()
+  return String((error as { code?: string } | null)?.code || "") === "42P01" || msg.includes("does not exist")
 }
 
 // ── Entry point ──────────────────────────────────────────────
@@ -53,7 +58,7 @@ Deno.serve(async (): Promise<Response> => {
     // Step 1: Fetch up to BATCH_SIZE pending emails.
     const { data: queue, error: qErr } = await supabase
       .from('email_queue')
-      .select('id, template_key, recipient_email, recipient_name, student_id, subject, body_html, status, payload')
+      .select('id, template_key, recipient_email, recipient_name, subject, status, payload, trace_id')
       .eq('status', 'Pending')
       .order('created_at', { ascending: true })
       .limit(BATCH_SIZE)
@@ -71,14 +76,28 @@ Deno.serve(async (): Promise<Response> => {
 
     const templateMap = new Map<string, EmailTemplate>()
     if (templateKeys.length) {
-      const { data: templates } = await supabase
+      const { data: notificationTemplates } = await supabase
         .from('notification_templates')
-        .select('template_key, subject, body_html')
+        .select('template_key, subject, body_html, active')
         .in('template_key', templateKeys)
         .eq('active', true)
 
-      for (const t of templates ?? []) {
+      for (const t of notificationTemplates ?? []) {
         templateMap.set(t.template_key, t)
+      }
+
+      const missingTemplateKeys = templateKeys.filter((k) => !templateMap.has(k))
+      if (missingTemplateKeys.length) {
+        const emailTemplateQuery = await supabase
+          .from('email_templates')
+          .select('template_key, subject, body_html, active')
+          .in('template_key', missingTemplateKeys)
+          .eq('active', true)
+        if (emailTemplateQuery.error && !isMissingRelationError(emailTemplateQuery.error)) throw emailTemplateQuery.error
+
+        for (const t of emailTemplateQuery.data ?? []) {
+          templateMap.set(t.template_key, t)
+        }
       }
     }
 
@@ -135,7 +154,9 @@ Deno.serve(async (): Promise<Response> => {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await logSync('EMAIL_SENDER_ERROR', message, { error: message }).catch(() => {})
+    try {
+      await logSync('EMAIL_SENDER_ERROR', message, { error: message })
+    } catch { /* ignore log errors */ }
     return json({ ok: false, error: message, ...result })
   }
 })
@@ -146,23 +167,15 @@ function resolveContent(
   row: EmailQueueRow,
   templateMap: Map<string, EmailTemplate>
 ): { subject: string; bodyHtml: string } {
-  // Step 2: Use row.body_html if present.
-  if (row.body_html) {
-    return {
-      subject:  row.subject ?? '(No subject)',
-      bodyHtml: substituteVariables(row.body_html, row)
-    }
-  }
-
-  // Step 3: Fall back to template.
+  // Step 2: Resolve from template.
   const template = row.template_key ? templateMap.get(row.template_key) : undefined
   if (!template) {
     throw new Error(
-      `No body_html on row and no template found for key: ${row.template_key ?? '(none)'}`
+      `No template found for key: ${row.template_key ?? '(none)'}`
     )
   }
 
-  // Step 4: Substitute {{recipient_name}} and metadata values.
+  // Step 3: Substitute {{recipient_name}} and metadata values.
   const subject  = substituteVariables(template.subject, row)
   const bodyHtml = substituteVariables(template.body_html ?? '', row)
   return { subject, bodyHtml }
@@ -241,12 +254,14 @@ async function logSync(
   message: string,
   details?: Record<string, unknown>
 ): Promise<void> {
-  await supabase.from('audit_logs').insert({
-    actor_email: 'email-sender@system',
-    action:      phase,
-    entity_type: 'email_queue',
-    entity_id:   'batch',
-    status:      'SUCCESS',
-    details:     { message, ...(details ?? {}) },
-  }).catch(() => {})
+  try {
+    await supabase.from('audit_logs').insert({
+      actor_email: 'email-sender@system',
+      action:      phase,
+      entity_type: 'email_queue',
+      entity_id:   'batch',
+      status:      'SUCCESS',
+      details:     { message, ...(details ?? {}) },
+    })
+  } catch { /* ignore log errors */ }
 }

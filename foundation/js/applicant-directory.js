@@ -15,6 +15,16 @@ const milestoneLabels = {
   needs_follow_up: "Needs Follow-up",
   foundation_completed: "Foundation Completed"
 };
+function displayGroupValue(app) {
+  const isRegional = String(app?.fellowship_code || "").toUpperCase() === "REGIONAL";
+  if (isRegional && !app?.group_id) return "Regional";
+  return app?.group_id || "-";
+}
+function displaySubgroupValue(app) {
+  const isRegional = String(app?.fellowship_code || "").toUpperCase() === "REGIONAL";
+  if (isRegional && !app?.subgroup_id) return "Regional";
+  return app?.subgroup_id || "-";
+}
 const state = {
   auth: null,
   applicants: [],
@@ -67,6 +77,20 @@ function getAttendanceSummary(app) {
   const pct = total ? Math.round((attended / total) * 100) : 0;
   const last = rows.map((r) => r.created_at || r.date || r.session_date).filter(Boolean).sort().at(-1) || null;
   return { pct, attended, total, last, missing: Math.max(0, total - attended) };
+}
+function getAttendanceStatusCounts(app) {
+  const rows = getAttendanceRows(app);
+  const out = { SUBMITTED: 0, LATE_START: 0, MISSING: 0 };
+  rows.forEach((r) => {
+    const key = String(r.session_status || "SUBMITTED").toUpperCase();
+    if (key === "LATE_START" || key === "MISSING" || key === "SUBMITTED") out[key] += 1;
+    else out.SUBMITTED += 1;
+  });
+  return out;
+}
+function attendanceStatusBadge(label, cls, count) {
+  if (!count) return "";
+  return `<span class="pill ${cls}">${esc(label)} (${count})</span>`;
 }
 function getNotificationRows(app) {
   const byId = String(app.id || "");
@@ -229,7 +253,7 @@ function renderTable(rows) {
       <td>${statusPill(summary.notificationState)}</td>
       <td>${esc(fmt(summary.lastActivity))}</td>
       <td><span class="pill ${rowStatus.cls}">${esc(rowStatus.label)}</span></td>
-      <td><div class="btns"><button class="btn" data-open="${esc(app.id)}">Open</button><button class="btn" data-correct="${esc(app.id)}">Correct</button></div></td>
+      <td><div class="btns"><button class="btn" data-open="${esc(app.id)}">Open</button><button class="btn" data-correct="${esc(app.id)}">Correct</button><button class="btn" data-direct-email="${esc(app.id)}">Email</button></div></td>
     </tr>`;
   }).join("");
   $("tableWrap").innerHTML = `<table><thead><tr>
@@ -244,11 +268,19 @@ function renderTable(rows) {
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div style="font-weight:800">${esc(app.full_name || "-")}</div><div class="muted" style="font-size:12px">${esc(app.email || "-")}</div></div><span class="pill ${rowStatus.cls}">${esc(rowStatus.label)}</span></div>
       <div style="margin-top:8px;font-size:12px" class="muted">${esc(app.class_option_id || "No class assigned")} · Attendance ${summary.attendancePct == null ? "-" : `${summary.attendancePct}%`}</div>
       <div style="margin-top:6px">${statusPill(summary.notificationState)}</div>
-      <div class="btns" style="margin-top:10px"><button class="btn" data-open="${esc(app.id)}">Open</button><button class="btn" data-correct="${esc(app.id)}">Correct</button></div>
+      <div class="btns" style="margin-top:10px"><button class="btn" data-open="${esc(app.id)}">Open</button><button class="btn" data-correct="${esc(app.id)}">Correct</button><button class="btn" data-direct-email="${esc(app.id)}">Email</button></div>
     </article>`;
   }).join("") || `<div class="muted">No registrants match the current filters.</div>`;
   document.querySelectorAll("[data-open]").forEach((btn) => btn.addEventListener("click", () => openDrawer(btn.getAttribute("data-open"))));
   document.querySelectorAll("[data-correct]").forEach((btn) => btn.addEventListener("click", () => openCorrectionModal(btn.getAttribute("data-correct"))));
+  document.querySelectorAll("[data-direct-email]").forEach((btn) => btn.addEventListener("click", () => openDirectEmailModalForApplicant(btn.getAttribute("data-direct-email"))));
+}
+function openDirectEmailModalForApplicant(applicantId) {
+  const app = state.applicants.find((a) => String(a.id) === String(applicantId || ""));
+  if (!app) return;
+  if (!app.email) { showFlash("Selected applicant does not have an email address.", "warn"); return; }
+  if (!window.FSDirectEmail?.open) { showFlash("Direct email modal is not available.", "error"); return; }
+  window.FSDirectEmail.open({ email: app.email, name: app.full_name || "" });
 }
 function updateBulkBar() {
   const bar = $("bulkBar");
@@ -423,6 +455,7 @@ function openDrawer(applicantId) {
   $("drawerSub").textContent = `${app.email || "-"} · ${app.phone || app.phone_number || "-"}`;
   $("overviewKv").innerHTML = `
     <div><label>Fellowship</label><strong>${esc(app.fellowship_code || app.fellowship || app.subgroup_id || "-")}</strong></div>
+    <div><label>Group / Subgroup</label><strong>${esc(displayGroupValue(app))} / ${esc(displaySubgroupValue(app))}</strong></div>
     <div><label>Assigned Class</label><strong>${esc(app.class_option_id || "-")}</strong></div>
     <div><label>Teacher</label><strong>${esc(cls?.teacher_name || cls?.teacher_id || "-")}</strong></div>
     <div><label>Batch</label><strong>${esc(app.batch_id || cls?.batch_id || "-")}</strong></div>
@@ -436,6 +469,14 @@ function openDrawer(applicantId) {
     <div><label>Last Attendance</label><strong>${esc(fmt(attendance.last))}</strong></div>
     <div><label>Missing Sessions</label><strong>${attendance.missing}</strong></div>
   `;
+  $("attendanceKv").insertAdjacentHTML(
+    "beforeend",
+    `<div style="grid-column:1/-1"><label>Attendance Session Status</label><div class="chips" style="margin-top:6px">${[
+      attendanceStatusBadge("Submitted", "completed", statusCounts.SUBMITTED),
+      attendanceStatusBadge("Late Start", "unassigned", statusCounts.LATE_START),
+      attendanceStatusBadge("Missing", "duplicate", statusCounts.MISSING),
+    ].filter(Boolean).join("") || '<span class="muted">No attendance status rows yet.</span>'}</div></div>`,
+  );
   const notifRows = getNotificationRows(app).slice(0, 40);
   $("notificationHistory").innerHTML = listRows(notifRows, (n) => `${esc(String(n.status || n.event_status || n.provider_status || "PENDING").toUpperCase())} · ${esc(n.event_type || "EVENT")}`);
   const emailRows = state.emails.filter((e) => {
@@ -665,6 +706,7 @@ function wireActions() {
   $("closeDrawerBtn").addEventListener("click", closeDrawer);
   $("changeClassBtn").addEventListener("click", () => openCorrectionModal(state.selectedApplicantId));
   $("needsFollowUpBtn").addEventListener("click", markNeedsFollowup);
+  $("sendEmailBtn").addEventListener("click", () => openDirectEmailModalForApplicant(state.selectedApplicantId));
   $("retryNotificationBtn").addEventListener("click", retryNotification);
   $("openAttendanceBtn").addEventListener("click", () => { window.location.href = "/foundation/staff/TeacherAttendancePortal.html"; });
   $("openMilestonesBtn").addEventListener("click", () => { window.location.href = "/foundation/staff/StudentProgressView.html"; });
@@ -735,28 +777,9 @@ function wireActions() {
     if (e.target.value) await executeBulkClass(e.target.value);
   });
   $("bulkEmailBtn").addEventListener("click", () => {
-    const emails = [...state.selectedIds].map((id) => {
-      const a = state.applicants.find((x) => String(x.id) === id);
-      return a?.email;
-    }).filter(Boolean);
-    if (!emails.length) { showFlash("No students selected.", "warn"); return; }
-    const subject = prompt("Email subject:");
-    if (!subject) return;
-    const message = prompt("Email message body:");
-    if (!message) return;
-    const now = new Date().toISOString();
-    Promise.all(emails.map((email) => {
-      const app = state.applicants.find((a) => (a.email || "").toLowerCase() === email.toLowerCase());
-      return supabase.from("email_queue").insert({
-        recipient_email: email, recipient_name: app?.full_name || "",
-        template_key: "announcement", subject, status: "Pending",
-        payload: { full_name: app?.full_name || "", message },
-      });
-    })).then(() => {
-      state.selectedIds.clear();
-      updateBulkBar();
-      showFlash(`Email queued for ${emails.length} students.`);
-    });
+    if (!state.selectedIds.size) { showFlash("No students selected.", "warn"); return; }
+    if (!window.FSDirectEmail?.open) { showFlash("Direct email modal is not available.", "error"); return; }
+    window.FSDirectEmail.open({ bulk: true });
   });
   $("bulkExportBtn").addEventListener("click", exportCsv);
   $("bulkClearBtn").addEventListener("click", () => {
@@ -832,6 +855,7 @@ async function boot() {
   const auth = await requireAuth(["admin", "superadmin", "principal", "regional_secretary"]);
   if (!auth) return;
   state.auth = auth;
+  window.FSDirectEmail?.init({ supabase, senderEmail: auth.profile?.email || "" });
   window.FSAdminShell && window.FSAdminShell.mount({
     active: "applicants",
     pageTitle: "Applicant Directory",

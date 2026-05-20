@@ -69,7 +69,7 @@
 
     const allowedRoles = new Set(["teacher", "admin", "superadmin", "subgroup_admin", "pastor", "principal", "regional_secretary"]);
     const sections = {
-      "attendance":   { title: "Attendance",   src: "../staff/TeacherAttendancePortal.html" },
+      "attendance":   { title: "Attendance",   src: "./teacher-attendance.html" },
       "my-class":     { title: "My Class",     src: "./sections/my-class.html" },
       "roster":       { title: "Class Roster", src: "./roster.html" },
       "availability": { title: "Availability", src: "./teacher-availability.html" },
@@ -175,7 +175,7 @@
       }
 
       document.getElementById("btnOut").addEventListener("click", async () => {
-        await supabase.auth.signOut();
+        try { await supabase.auth.signOut() } catch { /* ignore */ }
         window.location.replace("../auth/login.html");
       });
 

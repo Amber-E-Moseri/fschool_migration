@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <style>
@@ -176,7 +176,7 @@
         <button type="button" id="toggle-milestones" onclick="setView('milestones')" style="border:none; border-radius: 20px; padding: 6px 16px; font-size:13px; font-weight:600; cursor:pointer;">Milestones</button>
       </div>
       <div class="search-wrap">
-        <span class="search-icon">🔎</span>
+        <span class="search-icon">??</span>
         <input id="studentSearch" placeholder="Filter students..." oninput="filterTable()" autocomplete="off" />
       </div>
       <div style="display:flex;gap:6px;margin-left:auto">
@@ -537,7 +537,7 @@
   <script src="../js/ui.js"></script>
   <script src="../js/toast.js"></script>
   <script src="../js/modal.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, getCurrentProfile, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
     window.FS_SUPABASE_CLIENT = supabase;
@@ -584,6 +584,7 @@
   </script>
 </body>
 </html>
+
 
 
 

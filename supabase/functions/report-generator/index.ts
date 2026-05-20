@@ -24,6 +24,47 @@ import { corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SUPABASE_ANON_KEY    = Deno.env.get("SUPABASE_ANON_KEY") || "";
+
+function getBearerToken(req: Request): string | null {
+  const header = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || null;
+}
+
+async function requireAdminAccess(req: Request, serviceDb: ReturnType<typeof createClient>) {
+  const token = getBearerToken(req);
+  if (!token) {
+    return { ok: false as const, status: 401, error: "Missing bearer token" };
+  }
+
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const userRes = await authClient.auth.getUser();
+  if (userRes.error || !userRes.data?.user) {
+    return { ok: false as const, status: 401, error: "Invalid session" };
+  }
+
+  const user = userRes.data.user;
+  const { data: profile, error: profileErr } = await serviceDb
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (profileErr || !profile) {
+    return { ok: false as const, status: 403, error: "Forbidden" };
+  }
+
+  const role = String(profile.role || "").toLowerCase();
+  if (role !== "admin" && role !== "superadmin") {
+    return { ok: false as const, status: 403, error: "Forbidden" };
+  }
+
+  return { ok: true as const, user };
+}
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -477,11 +518,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST")    return jsonResponse({ ok: false, error: "POST required" }, 405);
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const auth = await requireAdminAccess(req, supabase);
+  if (!auth.ok) return jsonResponse({ ok: false, error: auth.error }, auth.status);
+
   let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return jsonResponse({ ok: false, error: "Invalid JSON" }, 400); }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   const report_type     = String(body.report_type  || "weekly");
   const scope           = String(body.scope        || "regional");

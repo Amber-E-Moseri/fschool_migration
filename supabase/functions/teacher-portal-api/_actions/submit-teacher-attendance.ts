@@ -19,6 +19,9 @@ export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise
         .map((s) => String(s || "").trim())
         .filter(Boolean);
       if (!classSessions.length) throw new ApiError("INVALID_PAYLOAD", "classSession is required", 400);
+      const firstSubmissionMeta = params.firstSubmissionMeta && typeof params.firstSubmissionMeta === "object"
+        ? params.firstSubmissionMeta
+        : null;
 
       const eligibleRecords = records.filter((r) => r && r.studentId);
       const allStudentIds = [...new Set(eligibleRecords.map((r) => String(r.studentId)))];
@@ -64,6 +67,115 @@ export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise
       }
 
       const nowIso = new Date().toISOString();
+      const attendanceCountRes = await withTimeout(
+        db
+          .from("attendance_log")
+          .select("attendance_id", { count: "exact", head: true })
+          .eq("class_option_id", classOptionId),
+        "first submission detection",
+      );
+      if (attendanceCountRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to detect first submission state", 500);
+      const isFirstSubmission = Number(attendanceCountRes.count || 0) === 0;
+
+      const parseYmd = (raw: unknown): string | null => {
+        const v = String(raw || "").trim();
+        if (!v) return null;
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toISOString().slice(0, 10);
+      };
+      const dateDiffDays = (fromYmd: string, toYmd: string): number => {
+        const from = new Date(`${fromYmd}T00:00:00Z`);
+        const to = new Date(`${toYmd}T00:00:00Z`);
+        return Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
+      };
+      const plusDays = (ymd: string, days: number): string => {
+        const d = new Date(`${ymd}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + days);
+        return d.toISOString().slice(0, 10);
+      };
+
+      if (isFirstSubmission) {
+        const startDateCandidate = firstSubmissionMeta?.actualStartDate ?? params.classDate;
+        const startDate = parseYmd(startDateCandidate);
+        if (!startDate) {
+          throw new ApiError("INVALID_PAYLOAD", "A valid classDate is required for first submission.", 400);
+        }
+
+        const activeSlotRes = await withTimeout(
+          db
+            .from("class_slots")
+            .select("batch_id,status,batches(batch_id,start_date,active,status)")
+            .eq("class_option_id", classOptionId)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          "resolve class batch for late start",
+        );
+        if (activeSlotRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to resolve class batch", 500);
+        const activeSlot = (activeSlotRes.data || []).find((row: any) => {
+          const batch = Array.isArray(row.batches) ? row.batches[0] : row.batches;
+          const batchActive = batch?.active === true || String(batch?.status || "").toUpperCase() === "ACTIVE";
+          const slotActive = String(row.status || "").toUpperCase() === "ACTIVE" || !row.status;
+          return batchActive && slotActive && String(batch?.start_date || "").trim();
+        });
+        const batchRef = activeSlot ? (Array.isArray(activeSlot.batches) ? activeSlot.batches[0] : activeSlot.batches) : null;
+        const batchStartDate = String(batchRef?.start_date || "").trim();
+        if (!batchStartDate) {
+          throw new ApiError("INVALID_PAYLOAD", "Unable to determine active batch start date for this class.", 400);
+        }
+
+        if (startDate < batchStartDate) {
+          throw new ApiError("INVALID_PAYLOAD", "Actual class start date cannot be before batch start date.", 400);
+        }
+        if (classDate && startDate > classDate) {
+          throw new ApiError("INVALID_PAYLOAD", "Actual class start date cannot be after the submitted class date.", 400);
+        }
+
+        const confirmedStartRes = await withTimeout(
+          db
+            .from("class_options")
+            .update({
+              confirmed_start_date: startDate,
+              updated_at: nowIso,
+              updated_by: auth.teacher.email,
+            })
+            .eq("class_option_id", classOptionId),
+          "save confirmed class start date",
+        );
+        if (confirmedStartRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to save confirmed class start date", 500);
+
+        const missedWeeks = Math.max(0, Math.floor(dateDiffDays(batchStartDate, startDate) / 7));
+        if (missedWeeks > 0 && allStudentIds.length > 0) {
+          const lateRows = allStudentIds.flatMap((studentId) => {
+            const meta = rosterMetaByStudentId.get(studentId);
+            return Array.from({ length: missedWeeks }).map((_, idx) => ({
+              student_id: studentId,
+              group_id: meta?.group_id ?? null,
+              subgroup_id: meta?.subgroup_id ?? null,
+              batch_id: meta?.batch_id ?? batchRef?.batch_id ?? null,
+              class_option_id: classOptionId || null,
+              teacher_name: auth.teacher.fullName || null,
+              class_number: String(idx + 1),
+              class_date: plusDays(batchStartDate, idx * 7),
+              present: false,
+              submitted_by_teacher: true,
+              submission_date: nowIso,
+              session_status: "LATE_START",
+              response_id: "Late start — confirmed by teacher",
+            }));
+          });
+          if (lateRows.length) {
+            const lateUpsertRes = await withTimeout(
+              db.from("attendance_log").upsert(lateRows, {
+                onConflict: "student_id,class_option_id,class_number,class_date",
+              }),
+              "late start backfill upsert",
+            );
+            if (lateUpsertRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to save late-start attendance history", 500);
+          }
+        }
+      }
+
       const inserts = presentStudentIds.flatMap((studentId) =>
         classSessions.map((session) => ({
           student_id: studentId,
@@ -78,6 +190,7 @@ export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise
           present: true,
           submitted_by_teacher: true,
           submission_date: nowIso,
+          session_status: "SUBMITTED",
         })),
       );
 

@@ -256,6 +256,14 @@ async function ensureEnrollment(moodleUrl: string, moodleToken: string, userId: 
   }
 }
 
+function hasCredentialPayload(payload: { moodle_url: string; moodle_username: string; moodle_temp_password: string }) {
+  return Boolean(
+    String(payload.moodle_url || "").trim()
+    && String(payload.moodle_username || "").trim()
+    && String(payload.moodle_temp_password || "").trim()
+  );
+}
+
 async function resolveCourseId(db: ReturnType<typeof createClient>, row: Record<string, unknown>) {
   const explicit = String(row.course_id || "").trim();
   if (explicit) return explicit;
@@ -306,6 +314,28 @@ Deno.serve(async (req) => {
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const payload = await req.json().catch(() => ({}));
+
+    // Recovery: reset rows stuck in PROCESSING for more than 30 minutes.
+    const processingStaleBeforeIso = new Date(Date.now() - (30 * 60 * 1000)).toISOString();
+    const { data: resetRows, error: resetError } = await db
+      .from("moodle_enrollment_sync")
+      .update({ sync_status: "PENDING", updated_at: new Date().toISOString() })
+      .eq("sync_status", "PROCESSING")
+      .lt("updated_at", processingStaleBeforeIso)
+      .select("id");
+    if (resetError) throw resetError;
+
+    const resetCount = Array.isArray(resetRows) ? resetRows.length : 0;
+    await logAudit(
+      db,
+      "MOODLE_SYNC_STUCK_RESET",
+      "stuck-processing-recovery",
+      "SUCCESS",
+      {
+        reset_count: resetCount,
+        threshold_minutes: 30,
+      },
+    );
 
     if (!isValidPayload(payload)) {
       return json({ ok: false, error: "Invalid payload", code: "INVALID_PAYLOAD" }, 400);
@@ -483,25 +513,67 @@ Deno.serve(async (req) => {
         const welcomePayload = (welcomeRow?.payload as Record<string, unknown> | null) ?? {};
         const classLabel = String(welcomePayload.class_label || welcomePayload.class_time || "");
 
+        const credentialsPayload = {
+          first_name: firstName,
+          full_name: fullName,
+          email,
+          moodle_url: "https://rocksolid.lwcanada.org/",
+          moodle_username: String(usernameUsed || ""),
+          moodle_temp_password: String(tempPassword || ""),
+          class_label: classLabel,
+          trace_id: traceId || null,
+        };
+        if (!hasCredentialPayload({
+          moodle_url: credentialsPayload.moodle_url,
+          moodle_username: credentialsPayload.moodle_username,
+          moodle_temp_password: credentialsPayload.moodle_temp_password,
+        })) {
+          const missingFields = [
+            !String(credentialsPayload.moodle_url || "").trim() ? "moodle_url" : "",
+            !String(credentialsPayload.moodle_username || "").trim() ? "moodle_username" : "",
+            !String(credentialsPayload.moodle_temp_password || "").trim() ? "moodle_temp_password" : "",
+          ].filter(Boolean);
+
+          await db.from("email_queue").insert({
+            recipient_email: email,
+            recipient_name: fullName,
+            template_key: "moodle_credentials",
+            subject: "Your Moodle Access - Rock Solid",
+            status: "Failed",
+            error_message: `DEAD_LETTER_MISSING_CREDENTIAL_FIELDS:${missingFields.join(",")}`,
+            trace_id: traceId || null,
+            payload: {
+              ...credentialsPayload,
+              dead_letter: true,
+              dead_letter_reason: "MISSING_CREDENTIAL_FIELDS",
+              missing_fields: missingFields,
+              class_option_id: String(row.class_option_id || ""),
+            },
+          });
+          await logAudit(db, "MOODLE_CREDENTIALS_EMAIL_DEAD_LETTERED", id, "FAILED", {
+            email,
+            class_option_id: String(row.class_option_id || ""),
+            missing_fields: missingFields,
+            ...(traceId ? { trace_id: traceId } : {}),
+          });
+          summary.failed += 1;
+          summary.failures.push({
+            id,
+            code: "MISSING_CREDENTIAL_FIELDS",
+            message: `Credential email dead-lettered. Missing: ${missingFields.join(", ")}`,
+          });
+          continue;
+        }
+
         const { error: emailQueueError } = await db.from("email_queue").insert({
           recipient_email: email,
           recipient_name: fullName,
           template_key: "moodle_credentials",
-          subject: "Your Moodle Access — Rock Solid Foundation School",
+          subject: "Your Moodle Access - Rock Solid",
           status: "Pending",
           trace_id: traceId || null,
-          payload: {
-            first_name: firstName,
-            full_name: fullName,
-            email,
-            moodle_url: "https://rocksolid.lwcanada.org/",
-            moodle_username: usernameUsed,
-            moodle_temp_password: tempPassword,
-            class_label: classLabel,
-            trace_id: traceId || null,
-          },
+          payload: credentialsPayload,
         });
-
         if (emailQueueError) {
           console.error("MOODLE_SYNC_CREDENTIALS_EMAIL_QUEUE_FAILED", { id, email, error: emailQueueError });
         } else {

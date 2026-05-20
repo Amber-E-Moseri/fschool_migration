@@ -3,7 +3,7 @@
 --
 -- Pipeline:
 --   scheduled_notifications.trace_id  (generated on insert)
---   → reminder-processor propagates it →
+--   → notification-batch-processor propagates it →
 --   email_queue.trace_id              (copied from the source notification)
 --
 -- Existing scheduled_notifications rows are backfilled with unique UUIDs.
@@ -37,3 +37,4 @@ ALTER TABLE public.email_queue
 
 CREATE INDEX IF NOT EXISTS email_queue_trace_id_idx
   ON public.email_queue(trace_id);
+

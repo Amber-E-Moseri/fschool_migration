@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -280,6 +280,14 @@
       return `${name} failed to load: ${msg}`;
     }
 
+    function assertRpcOk(result, fallback = "Operation failed") {
+      if (result?.error) throw result.error;
+      if (result?.data && typeof result.data === "object" && result.data.ok === false) {
+        throw new Error(String(result.data.error || fallback));
+      }
+      return result?.data || null;
+    }
+
     async function trySelect(table, projections) {
       let lastError = null;
       for (const projection of projections) {
@@ -386,7 +394,7 @@
     function renderTable() {
       const rows = currentRows();
       if (!rows.length) {
-        els.tableHost.innerHTML = `<div class="fs-table-empty"><div class="emoji">ðŸ“­</div><h3 style="margin:0 0 6px">${esc(tabMeta[state.activeTab].empty)}</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a record to get started."}</p></div>`;
+        els.tableHost.innerHTML = `<div class="fs-table-empty"><div class="emoji">📭</div><h3 style="margin:0 0 6px">${esc(tabMeta[state.activeTab].empty)}</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a record to get started."}</p></div>`;
         return;
       }
       if (state.activeTab === "staff") return renderStaffTable(rows);
@@ -555,9 +563,15 @@
       if (!row) return;
       state.editing = { kind: "teacher-link", id };
       els.entityModalTitle.textContent = "Link Teacher to Auth User";
-      els.entityFormGrid.innerHTML = fieldHtml("Teacher Email", "fEmail", "email", row[state.teachersEmailKey] || "", true) +
-        `<div class="field full"><p class="muted" style="margin:0">This looks up profiles by email and writes teachers.teacher_user_id.</p></div>`;
-      openModal(els.entityModalOverlay, $("fEmail"));
+      els.entityFormGrid.innerHTML = fieldHtml("Teacher ID", "fTeacherId", "text", row[state.teacherIdKey] || "", true) +
+        fieldHtml("Teacher Email", "fEmail", "email", row[state.teachersEmailKey] || "", true) +
+        fieldHtml("Auth User ID (UUID)", "fAuthUserId", "text", "", true) +
+        `<div class="field full"><label style="display:flex;gap:8px;align-items:center;font-size:13px;">
+          <input id="fAllowRelink" type="checkbox" />
+          <span>Allow relink (required when teacher is already linked)</span>
+        </label></div>` +
+        `<div class="field full"><p class="muted" style="margin:0">Email-only auto-linking is disabled. You must provide the exact auth user id.</p></div>`;
+      openModal(els.entityModalOverlay, $("fAuthUserId"));
     }
 
     async function toggleStaffActive(id) {
@@ -602,8 +616,17 @@
       const row = state.rows.teachers.find((r) => String(r[state.teacherIdKey] || "") === String(id));
       if (!row) return;
       if (!window.confirm(`Unlink auth user from ${row[state.teacherNameKey] || "this teacher"}?`)) return;
-      const { error } = await supabase.from("teachers").update({ teacher_user_id: null, updated_at: new Date().toISOString() }).eq(state.teacherIdKey, row[state.teacherIdKey]);
-      if (error) { notify(`Unlink failed: ${error.message}`, "error"); return; }
+      try {
+        const rpcRes = await supabase.rpc("unlink_teacher_from_auth_user", {
+          p_teacher_id: row[state.teacherIdKey],
+          p_actor_email: state.auth?.profile?.email || null,
+          p_reason: "admin-management unlink",
+        });
+        assertRpcOk(rpcRes, "Unlink failed.");
+      } catch (error) {
+        notify(`Unlink failed: ${error.message || error}`, "error");
+        return;
+      }
       notify("Teacher auth link removed.", "success");
       await loadTeachers();
       render();
@@ -710,15 +733,21 @@
         if (kind === "teacher-link") {
           const row = state.rows.teachers.find((r) => String(r[state.teacherIdKey] || "") === String(state.editing.id));
           if (!row) return notify("Teacher row not found.", "error");
-          const email = String($("fEmail")?.value || "").trim().toLowerCase();
-          if (!email) return notify("Email is required.", "warning");
-          const lookup = await trySelect("profiles", ["id,user_id,email", "id,email"]);
-          if (lookup.error) return notify(`Profile lookup failed: ${lookup.error.message}`, "error");
-          const found = (lookup.data || []).find((p) => String(p.email || "").trim().toLowerCase() === email);
-          if (!found) return notify("No profile found for that email.", "error");
-          const authUserId = found.user_id || found.id;
-          const { error } = await supabase.from("teachers").update({ teacher_user_id: authUserId, updated_at: now }).eq(state.teacherIdKey, row[state.teacherIdKey]);
-          if (error) return notify(`Link failed: ${error.message}`, "error");
+          const teacherId = String($("fTeacherId")?.value || "").trim();
+          const authUserId = String($("fAuthUserId")?.value || "").trim();
+          const allowRelink = $("fAllowRelink")?.checked === true;
+          if (!teacherId || !authUserId) return notify("Teacher ID and Auth User ID are required.", "warning");
+          try {
+            const rpcRes = await supabase.rpc("link_teacher_to_auth_user", {
+              p_teacher_id: teacherId,
+              p_auth_user_id: authUserId,
+              p_actor_email: state.auth?.profile?.email || null,
+              p_allow_relink: allowRelink,
+            });
+            assertRpcOk(rpcRes, "Link failed.");
+          } catch (error) {
+            return notify(`Link failed: ${error.message || error}`, "error");
+          }
           notify("Teacher linked to auth user.", "success");
           closeModal(els.entityModalOverlay);
           await loadTeachers();
@@ -820,7 +849,7 @@
       }
       state.activeTab = state.visibleTabs[0];
       const profile = await getCurrentProfile().catch(() => auth.profile);
-      els.welcomeLine.textContent = `${profile?.full_name || profile?.email || "Staff"} Â· ${role}`;
+      els.welcomeLine.textContent = `${profile?.full_name || profile?.email || "Staff"} · ${role}`;
       return true;
     }
 
@@ -844,11 +873,12 @@
       els.errorHost.innerHTML = `<div class="fs-banner fs-banner-danger">Page failed to load: ${esc(info.message || err?.message || err)}</div>`;
     });
   </script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script>
     window.FSAdminShell && window.FSAdminShell.mount({ active: "adminmanagement", pageTitle: "Admin Management" });
   </script>
 </body>
 </html>
+
 
 

@@ -62,7 +62,6 @@ tr:hover td{background:#faf9ff}
         <option value="foundation_welcome">Foundation Welcome</option>
         <option value="class_reminder">Class Reminder</option>
         <option value="no_suitable_times">No Suitable Times</option>
-        <option value="tmc26_reminder">TMC26 Reminder</option>
       </select>
     </div>
 
@@ -82,7 +81,10 @@ tr:hover td{background:#faf9ff}
 <section class="card">
   <div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
     <h2 style="margin:0;">Email Queue</h2>
-    <button class="secondary" onclick="loadEmails()">Refresh</button>
+    <div class="actions">
+      <button class="secondary" onclick="openDirectEmailModal()">New Direct Email</button>
+      <button class="secondary" onclick="loadEmails()">Refresh</button>
+    </div>
   </div>
 
   <div id="emails"></div>
@@ -92,6 +94,7 @@ tr:hover td{background:#faf9ff}
 
 <script src="../js/config.js"></script>
 <script src="../js/config-helper.js"></script>
+<script src="../js/direct-email-modal.js"></script>
 <script type="module">
 import { supabase, requireAuth, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
 
@@ -101,6 +104,7 @@ if (!auth || !(isAdmin(auth.profile?.role) || isRegionalSecretary(auth.profile?.
 }
 
 const db = supabase;
+window.FSDirectEmail?.init({ supabase, senderEmail: auth?.profile?.email || "" });
 
 const $ = id => document.getElementById(id);
 
@@ -209,6 +213,14 @@ async function queueEmail(){
   loadEmails();
 }
 
+function openDirectEmailModal() {
+  if (!window.FSDirectEmail?.open) {
+    alert("Direct email modal is not available.");
+    return;
+  }
+  window.FSDirectEmail.open({ bulk: true });
+}
+
 async function loadEmails(){
   const el = $("emails");
   el.innerHTML = "Loading...";
@@ -247,15 +259,17 @@ async function loadEmails(){
 }
 
 loadEmails();
+window.openDirectEmailModal = openDirectEmailModal;
 </script>
 
   <script src="../ui/premium-shell.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script>
     window.FSAdminShell && window.FSAdminShell.mount({ active: "email", pageTitle: "Email Campaigns" });
   </script>
 </body>
 </html>
+
 
 
 

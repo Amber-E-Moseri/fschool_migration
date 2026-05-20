@@ -1,0 +1,19 @@
+/supabase/*
+  X-Robots-Tag: noindex
+  Cache-Control: no-store
+
+/ai/*
+  X-Robots-Tag: noindex
+  Cache-Control: no-store
+
+/archive/*
+  X-Robots-Tag: noindex
+  Cache-Control: no-store
+
+/foundation/docs/*
+  X-Robots-Tag: noindex
+  Cache-Control: no-store
+
+/*.sql
+  X-Robots-Tag: noindex
+  Cache-Control: no-store

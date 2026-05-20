@@ -252,6 +252,18 @@ Deno.serve(async (req) => {
     const reviewNotes = assignment.reviewNotes ?? null;
     const legacyStatus = String(assignment.legacyStatus || "Pending");
     batch_id = assignment.batchId ?? batch_id;
+    let group_id: string | null = null;
+    let subgroup_id: string | null = null;
+    if (fellowship_code && fellowship_code.toUpperCase() !== "REGIONAL") {
+      const { data: fellowshipRow } = await db
+        .from("fellowship_map")
+        .select("group_id,subgroup_id")
+        .eq("fellowship_code", fellowship_code)
+        .eq("active", true)
+        .maybeSingle();
+      group_id = String(fellowshipRow?.group_id || "").trim() || null;
+      subgroup_id = String(fellowshipRow?.subgroup_id || "").trim() || null;
+    }
 
     const applicantInsertBase = {
       id: applicantId,
@@ -261,6 +273,8 @@ Deno.serve(async (req) => {
       email,
       phone,
       fellowship_code: fellowship_code || null,
+      group_id,
+      subgroup_id,
       class_option_id: class_option_id || null,
       batch_id: batch_id || null,
       availability,

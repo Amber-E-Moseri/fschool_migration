@@ -1437,6 +1437,10 @@ function bindTempDraftListeners() {
       if (!(target instanceof HTMLInputElement) || target.name !== 'classChoice') return;
       formData.classChoice = target.value || '';
       formData.classLabel  = target.dataset?.label || '';
+      if (classViewMode === 'regionalOnly') {
+        const fellowshipInputValue = document.getElementById('fellowship')?.value?.trim() || '';
+        formData.fellowshipCode = fellowshipInputValue || formData.fellowshipCode || '';
+      }
       if (target.value === 'NONE') renderClassesForSelectedFellowship('regionalOnly');
       else if (classViewMode === 'regionalOnly') renderClassesForSelectedFellowship('normal');
       saveTempDraft();
@@ -1707,7 +1711,7 @@ async function loadClasses() {
   try {
     showClassSkeleton();
     const res = await fetch(
-      `${CONFIG.SUPABASE_URL}/rest/v1/class_options?active=eq.true&enrollment_open=eq.true&deleted_at=is.null&select=class_option_id,class_id,fellowship_codes,teacher_id,teacher_name,day,class_time,active`,
+      `${CONFIG.SUPABASE_URL}/rest/v1/class_options?active=eq.true&enrollment_open=eq.true&deleted_at=is.null&select=class_option_id,class_id,fellowship_codes,teacher_id,teacher_name,day,class_time,active,is_online,confirmed_start_date`,
       { headers: { 'apikey': CONFIG.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error('Failed to load class options');
@@ -1723,7 +1727,8 @@ async function loadClasses() {
         day: r.day || '',
         time: r.class_time || '',
         active: 'true',
-        classStartDate: '',
+        classStartDate: r.confirmed_start_date || '',
+        isOnline: r.is_online === true,
         timezone: fellowshipTzMap[firstCode] || 'America/Toronto'
       };
     });
@@ -1789,6 +1794,7 @@ function renderClassesForSelectedFellowship(mode = classViewMode) {
         <div class="class-card-label">
           <div class="class-info">
             <div class="class-name">${classLine}</div>
+            ${cls.isOnline ? `<div class="class-badge">Online — open to all campuses</div>` : ''}
             ${session.startLine   ? `<div class="class-time">${session.startLine}</div>`   : ''}
             ${session.mismatch    ? `<div class="class-time">${session.originalLine}</div>` : ''}
           </div>
@@ -1858,7 +1864,11 @@ async function submitForm() {
         headers: { 'Content-Type':'application/json', 'apikey': CONFIG.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}` },
         body: JSON.stringify({
           full_name: fullName, email: formData.email, phone: formData.phone || '',
-          fellowship_code: formData.fellowshipCode || null,
+          fellowship_code: (formData.fellowshipCode === 'REGIONAL' ||
+                            formData.fellowshipCode === 'REG' ||
+                            formData.fellowshipCode === 'REGALL')
+            ? (document.getElementById('fellowship')?.value || null)
+            : (formData.fellowshipCode || null),
           class_option_id: classId || null,
           batch_id: null,
           first_name: formData.firstName, last_name: formData.lastName,

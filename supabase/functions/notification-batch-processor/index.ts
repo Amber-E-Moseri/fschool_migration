@@ -44,6 +44,8 @@ function buildSubjectFromTemplate(templateKey: string): string {
     class_reminder_7_day: "Reminder: your class starts in 7 days",
     class_reminder_1_day: "Reminder: your class starts tomorrow",
     class_reminder_2_hour: "Reminder: your class starts in 2 hours",
+    attendance_reminder: "Attendance reminder — {{class_name}} Session {{session_number}}",
+    attendance_escalation: "Missing attendance — {{teacher_name}} {{class_name}}",
   };
   return map[templateKey] || "Foundation School Notification";
 }

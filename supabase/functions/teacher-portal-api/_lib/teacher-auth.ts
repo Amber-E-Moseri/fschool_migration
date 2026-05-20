@@ -61,7 +61,8 @@ export async function resolveAuthContext(req: Request, dbService: any) {
   );
   const profileRole = safeLower(profileRes.data?.role);
   const profileActive = profileRes.data?.is_active !== false;
-  const allowedRoles = new Set(["teacher", "admin", "superadmin", "subgroup_admin", "pastor", "principal"]);
+  const allowedRoles = new Set(["teacher", "admin", "superadmin", "subgroup_admin", "pastor", "principal", "regional_secretary"]);
+  const adminLikeRoles = new Set(["admin", "superadmin", "subgroup_admin", "pastor", "principal", "regional_secretary"]);
   if (!profileRes.data || !profileActive || !allowedRoles.has(profileRole)) {
     await writeAudit(dbService, {
       action: "TEACHER_ACCESS_DENIED",
@@ -77,29 +78,84 @@ export async function resolveAuthContext(req: Request, dbService: any) {
     throw new ApiError("UNAUTHORIZED", "Forbidden", 403);
   }
 
-  const teacherRes = await withTimeout(
+  const linkedTeachersRes = await withTimeout(
     dbService
       .from("teachers")
-      .select("teacher_id,full_name,email,active,status,deleted_at")
-      .ilike("email", email)
-      .limit(1)
-      .maybeSingle(),
-    "resolve teacher mapping",
+      .select("teacher_id,full_name,email,active,status,deleted_at,teacher_user_id")
+      .eq("teacher_user_id", user.id)
+      .limit(2),
+    "resolve teacher mapping by teacher_user_id",
   );
 
-  if (teacherRes.error || !teacherRes.data) {
-    console.error("[INVALID_TEACHER_MAPPING]", { looked_up_email: email, db_error: teacherRes.error?.message ?? null });
+  if (linkedTeachersRes.error) {
+    throw new ApiError("INTERNAL_ERROR", linkedTeachersRes.error.message || "Failed to resolve teacher mapping", 500);
+  }
+
+  const linkedTeachers = linkedTeachersRes.data || [];
+  if (linkedTeachers.length > 1) {
     await writeAudit(dbService, {
       action: "TEACHER_ACCESS_DENIED",
       actorId: user.id,
       actorEmail: email,
       status: "INVALID_TEACHER_MAPPING",
-      details: { reason: teacherRes.error?.message || "No teacher row found" },
+      details: { reason: "Multiple teachers linked to same auth user", count: linkedTeachers.length },
+    });
+    throw new ApiError("INVALID_TEACHER_MAPPING", "Multiple teacher records are linked to this account. Contact an admin.", 403);
+  }
+
+  let teacher = linkedTeachers[0] || null;
+
+  if (!teacher) {
+    const teacherRes = await withTimeout(
+      dbService
+        .from("teachers")
+        .select("teacher_id,full_name,email,active,status,deleted_at,teacher_user_id")
+        .ilike("email", email)
+        .is("teacher_user_id", null)
+        .limit(2),
+      "resolve teacher mapping legacy fallback",
+    );
+    if (teacherRes.error) {
+      throw new ApiError("INTERNAL_ERROR", teacherRes.error.message || "Failed to resolve teacher mapping", 500);
+    }
+    const fallbackRows = teacherRes.data || [];
+    if (fallbackRows.length === 1) {
+      teacher = fallbackRows[0];
+    } else if (fallbackRows.length > 1) {
+      await writeAudit(dbService, {
+        action: "TEACHER_ACCESS_DENIED",
+        actorId: user.id,
+        actorEmail: email,
+        status: "INVALID_TEACHER_MAPPING",
+        details: { reason: "Ambiguous legacy email fallback", email, count: fallbackRows.length },
+      });
+      throw new ApiError("INVALID_TEACHER_MAPPING", "Multiple teacher records match this email. Ask an admin to link your account explicitly.", 403);
+    }
+  }
+
+  if (!teacher) {
+    if (adminLikeRoles.has(profileRole)) {
+      return {
+        user,
+        role: profileRole || "admin",
+        teacherMapped: false,
+        teacher: {
+          teacherId: "",
+          fullName: String(user.user_metadata?.full_name || user.email || "Admin"),
+          email,
+        },
+      };
+    }
+    console.error("[INVALID_TEACHER_MAPPING]", { looked_up_email: email, db_error: null });
+    await writeAudit(dbService, {
+      action: "TEACHER_ACCESS_DENIED",
+      actorId: user.id,
+      actorEmail: email,
+      status: "INVALID_TEACHER_MAPPING",
+      details: { reason: "No teacher row found" },
     });
     throw new ApiError("INVALID_TEACHER_MAPPING", "No teacher record is mapped to this account. Ask an admin to link your email to a teacher record.", 403);
   }
-
-  const teacher = teacherRes.data;
   const teacherStatus = String(teacher.status || "").trim().toUpperCase();
   if (
     teacher.deleted_at ||
@@ -120,6 +176,8 @@ export async function resolveAuthContext(req: Request, dbService: any) {
 
   return {
     user,
+    role: profileRole || "teacher",
+    teacherMapped: true,
     teacher: {
       teacherId: String(teacher.teacher_id),
       fullName: String(teacher.full_name || ""),

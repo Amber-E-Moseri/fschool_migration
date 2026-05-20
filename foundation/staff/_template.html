@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Solid - Page Title</title>
+
+  <!-- Standard CSS order -->
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+</head>
+<body>
+  <main class="fs-content">
+    <!-- Replace title/subtitle/action for your page -->
+    <div class="fs-page-header">
+      <div>
+        <h1 class="fs-page-title">Page Title</h1>
+        <p class="fs-page-subtitle">Short page description.</p>
+      </div>
+      <div class="fs-page-actions">
+        <button class="fs-btn fs-btn-primary" type="button">Primary Action</button>
+      </div>
+    </div>
+
+    <section class="fs-card">
+      <!-- Replace with page filters / controls -->
+      <div class="fs-action-bar" style="margin-bottom:12px;">
+        <div class="fs-action-bar-search">
+          <input class="fs-input" type="search" placeholder="Search..." />
+        </div>
+        <div class="fs-action-bar-actions">
+          <button class="fs-btn fs-btn-secondary" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Replace with table/cards/content -->
+      <div class="fs-table-wrap">
+        <table class="fs-table">
+          <thead>
+            <tr><th>Column</th><th>Column</th><th>Column</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Sample</td><td>Replace</td><td>Rows</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Standard script order -->
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
+  <script src="../js/admin-ui.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/admin-api.js"></script>
+  <script src="../js/admin-shell.js?v=20260519"></script>
+
+  <!-- Replace this module with your page module file when ready -->
+  <script type="module">
+    import { requireAuth } from "../auth/auth-client.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    async function boot() {
+      // 1) Config guard
+      if (!window.FS_CONFIG?.SUPABASE_URL) {
+        document.body.insertAdjacentHTML(
+          "afterbegin",
+          `<div class="fs-banner fs-banner-warning" style="margin:12px;">Not connected. Create config.js from config.js.example.</div>`,
+        );
+        return;
+      }
+
+      // 2) Auth guard (admin-only by default)
+      const auth = await requireAuth(["admin", "superadmin"]);
+      if (!auth) return;
+
+      // 3) Shell mount
+      window.FSAdminShell?.mount({
+        active: "PAGE_KEY",
+        pageTitle: "Page Title",
+        role: auth.profile?.role || "",
+      });
+
+      // 4) Page init starts here
+      // - load data
+      // - render state
+      // - bind events
+      void $;
+    }
+
+    boot().catch((err) => {
+      const msg = String(err?.message || err);
+      document.body.insertAdjacentHTML(
+        "afterbegin",
+        `<div class="fs-banner fs-banner-danger" style="margin:12px;">Failed to initialize: ${msg}</div>`,
+      );
+    });
+  </script>
+
+  <!-- Replace this placeholder with external page module when implemented:
+       <script type="module" src="../js/your-page.js"></script>
+  -->
+</body>
+</html>

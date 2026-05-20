@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <style>
@@ -495,15 +495,17 @@ async function submitAvailability(){show("error",""); show("ok",""); const recor
   if(!state.teacherName.trim()||!state.teacherEmail.trim()) return show("error","Please enter teacher name and email.");
   if(!state.teacherTimezone) return show("error","Please select teacher timezone.");
   if(totalSlots()===0) return show("error","Select at least one slot before submitting.");
+  if(!state.selectedCampusCodes.size) return show("error","Select at least one campus before submitting.");
   state.submitting=true; el("submit").disabled=true; el("submitState").textContent="Submitting...";
   try{
     const m = selectedMonth();
-    const slots = [];
-    [...state.selectedCampusCodes].forEach(code => {
-      [...state.slotSet].forEach(k => {
-        const s = splitKey(k);
-        slots.push({ campusCode: code, teacherDay: s.day, teacherTime: s.time });
-      });
+    const slots = [...state.slotSet].map((k) => {
+      const s = splitKey(k);
+      return {
+        teacherDay: s.day,
+        teacherTime: s.time,
+        selectedCampusCodes: [...state.selectedCampusCodes],
+      };
     });
     const payload={
       teacherName: state.teacherName.trim(),
@@ -525,7 +527,7 @@ async function submitAvailability(){show("error",""); show("ok",""); const recor
 
 function render(){state.teacherName=el("teacherName").value; state.teacherEmail=el("teacherEmail").value; state.teacherTimezone=el("teacherTimezone").value; state.monthKey=el("month").value; applyTeacherMatch(); renderCampusGroups(); renderGrid(); renderSummary();
   el("selStats").textContent=`${totalSlots()} slots selected in teacher timezone`;
-  show("multiCampusNotice", state.selectedCampusCodes.size>1 ? "The same availability will be converted separately for each selected campus." : "");
+  show("multiCampusNotice", state.selectedCampusCodes.size>1 ? "One slot will be stored with all selected campuses and approved into one class option." : "");
   el("review").disabled=!(state.teacherName.trim()&&state.teacherEmail.trim()&&state.teacherTimezone&&totalSlots()>0&&state.selectedCampusCodes.size>0);
 }
 
@@ -557,7 +559,7 @@ window.addEventListener("load", () => {
   <script src="../js/ui.js"></script>
   <script src="../js/toast.js"></script>
   <script src="../js/modal.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, getCurrentProfile, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
     window.FS_SUPABASE_CLIENT = supabase;
@@ -616,6 +618,8 @@ window.addEventListener("load", () => {
   </script>
 </body>
 </html>
+
+
 
 
 

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Solid - Fellowship Management</title>
+  <link rel="stylesheet" href="../ui/tokens.css" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
+  <style>
+    body { margin: 0; background: var(--color-bg); color: var(--color-text-primary); }
+    .fs-page-header { margin-bottom: var(--space-4); }
+    .fs-filters {
+      display: grid;
+      gap: var(--space-3);
+      grid-template-columns: minmax(240px, 1.6fr) repeat(3, minmax(160px, 1fr));
+      margin-bottom: var(--space-4);
+    }
+    .fs-field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .fs-label { font-size: var(--fs-label); color: var(--color-text-muted); font-weight: 600; }
+    .fs-input, .fs-select, .fs-textarea {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      font: inherit;
+      background: var(--color-surface);
+      color: var(--color-text-primary);
+    }
+    .fs-actions { display: flex; gap: var(--space-2); }
+    .fs-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 21, 42, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+      padding: var(--space-4);
+    }
+    .fs-modal-overlay.open { display: flex; }
+    .fs-modal {
+      width: min(760px, 100%);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-raised);
+      overflow: hidden;
+    }
+    .fs-modal-head, .fs-modal-foot { padding: var(--space-4); border-bottom: 1px solid var(--color-border); }
+    .fs-modal-foot { border-bottom: 0; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: var(--space-2); }
+    .fs-modal-body { padding: var(--space-4); }
+    .fs-modal-grid { display: grid; gap: var(--space-3); grid-template-columns: 1fr 1fr; }
+    .fs-col-2 { grid-column: 1 / -1; }
+    .fs-inline { display: flex; align-items: center; gap: var(--space-2); }
+    @media (max-width: 980px) { .fs-filters { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 720px) {
+      .fs-filters { grid-template-columns: 1fr; }
+      .fs-modal-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="fs-content">
+    <section class="fs-page-header">
+      <div>
+        <h1 class="fs-page-title">Fellowship Management</h1>
+        <p class="fs-page-subtitle">Create and manage fellowship campus mappings.</p>
+      </div>
+      <div class="fs-page-actions">
+        <button id="refreshBtn" class="fs-btn fs-btn-secondary" type="button">Refresh</button>
+        <button id="addBtn" class="fs-btn fs-btn-primary" type="button">Add Fellowship</button>
+      </div>
+    </section>
+
+    <section class="fs-card">
+      <div class="fs-filters">
+        <label class="fs-field">
+          <span class="fs-label">Search</span>
+          <input id="searchInput" class="fs-input" type="search" placeholder="Code or campus name" />
+        </label>
+        <label class="fs-field">
+          <span class="fs-label">Group</span>
+          <select id="groupFilter" class="fs-select">
+            <option value="">All</option>
+            <option value="CE">CE</option>
+            <option value="CS">CS</option>
+            <option value="WS">WS</option>
+          </select>
+        </label>
+        <label class="fs-field">
+          <span class="fs-label">Subgroup</span>
+          <select id="subgroupFilter" class="fs-select">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label class="fs-field">
+          <span class="fs-label">Active</span>
+          <select id="activeFilter" class="fs-select">
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="fs-table-wrap">
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>Fellowship Code</th>
+              <th>Campus Name</th>
+              <th>Group</th>
+              <th>Subgroup</th>
+              <th>Timezone</th>
+              <th>Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="7" class="fs-table-loading">Loading fellowships...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="fellowshipModalOverlay" class="fs-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="fellowshipModalTitle">
+    <div class="fs-modal">
+      <div class="fs-modal-head">
+        <h2 id="fellowshipModalTitle" class="fs-card-title">Add Fellowship</h2>
+      </div>
+      <form id="fellowshipForm" class="fs-modal-body">
+        <div class="fs-modal-grid">
+          <label class="fs-field">
+            <span class="fs-label">Fellowship Code</span>
+            <input id="fellowshipCodeInput" class="fs-input" type="text" required maxlength="20" placeholder="MUN" />
+          </label>
+          <label class="fs-field">
+            <span class="fs-label">Campus Name</span>
+            <input id="campusNameInput" class="fs-input" type="text" required placeholder="Memorial University" />
+          </label>
+          <label class="fs-field">
+            <span class="fs-label">Group</span>
+            <select id="groupInput" class="fs-select" required>
+              <option value="">Select group</option>
+              <option value="CE">CE</option>
+              <option value="CS">CS</option>
+              <option value="WS">WS</option>
+            </select>
+          </label>
+          <label class="fs-field">
+            <span class="fs-label">Subgroup</span>
+            <select id="subgroupInput" class="fs-select" required>
+              <option value="">Select subgroup</option>
+            </select>
+          </label>
+          <label class="fs-field fs-col-2">
+            <span class="fs-label">Timezone</span>
+            <select id="timezoneInput" class="fs-select" required>
+              <option value="America/Toronto">America/Toronto</option>
+              <option value="America/Vancouver">America/Vancouver</option>
+              <option value="America/Edmonton">America/Edmonton</option>
+              <option value="America/Winnipeg">America/Winnipeg</option>
+              <option value="America/Halifax">America/Halifax</option>
+              <option value="America/St_Johns">America/St_Johns</option>
+              <option value="America/Regina">America/Regina</option>
+            </select>
+          </label>
+          <label class="fs-inline fs-col-2">
+            <input id="activeInput" type="checkbox" checked />
+            <span class="fs-label" style="margin:0">Active</span>
+          </label>
+        </div>
+      </form>
+      <div class="fs-modal-foot">
+        <button id="cancelModalBtn" class="fs-btn fs-btn-secondary" type="button">Cancel</button>
+        <button id="saveModalBtn" class="fs-btn fs-btn-primary" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/admin-shell.js?v=20260519"></script>
+  <script type="module">
+    import { supabase, requireAuth, getCurrentProfile, isAdmin } from "../auth/auth-client.js";
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+    const SUBGROUPS = { CE: ["CESGA", "CESGB"], CS: ["CSGA", "CSGB"], WS: ["WSGA", "WSGB"] };
+
+    const state = {
+      auth: null,
+      fellowships: [],
+      filtered: [],
+      editingCode: null,
+      filters: { search: "", group: "", subgroup: "", active: "" },
+    };
+
+    function notify(msg, type = "info", ttl = 3600) {
+      if (window.FSToast?.show) window.FSToast.show(msg, type, ttl);
+    }
+
+    function setSubgroupOptions(group, selectId, selected = "") {
+      const sel = $(selectId);
+      const list = group
+        ? (SUBGROUPS[group] || [])
+        : Object.values(SUBGROUPS).flat();
+      sel.innerHTML = `<option value="">${selectId === "subgroupFilter" ? "All" : "Select subgroup"}</option>` +
+        list.map((v) => `<option value="${v}" ${v === selected ? "selected" : ""}>${v}</option>`).join("");
+    }
+
+    function statusBadge(active) {
+      return active
+        ? '<span class="fs-badge fs-badge-success">Yes</span>'
+        : '<span class="fs-badge fs-badge-danger">No</span>';
+    }
+
+    function applyFilters() {
+      const q = state.filters.search.trim().toLowerCase();
+      state.filtered = state.fellowships.filter((r) => {
+        if (q) {
+          const pool = `${r.fellowship_code || ""} ${r.campus_name || ""}`.toLowerCase();
+          if (!pool.includes(q)) return false;
+        }
+        if (state.filters.group && r.group_id !== state.filters.group) return false;
+        if (state.filters.subgroup && r.subgroup_id !== state.filters.subgroup) return false;
+        if (state.filters.active === "true" && r.active !== true) return false;
+        if (state.filters.active === "false" && r.active !== false) return false;
+        return true;
+      });
+      renderRows();
+    }
+
+    function renderRows() {
+      const rowsEl = $("rows");
+      if (!state.filtered.length) {
+        rowsEl.innerHTML = '<tr><td colspan="7" class="fs-table-empty">No fellowships match the current filters.</td></tr>';
+        return;
+      }
+      rowsEl.innerHTML = state.filtered.map((row) => `
+        <tr>
+          <td><strong>${esc(row.fellowship_code || "-")}</strong></td>
+          <td>${esc(row.campus_name || "-")}</td>
+          <td>${esc(row.group_id || "-")}</td>
+          <td>${esc(row.subgroup_id || "-")}</td>
+          <td>${esc(row.timezone || "-")}</td>
+          <td>${statusBadge(row.active !== false)}</td>
+          <td>
+            <div class="fs-actions">
+              <button type="button" class="fs-btn fs-btn-secondary" data-edit="${esc(row.fellowship_code)}">Edit</button>
+              ${row.active !== false ? `<button type="button" class="fs-btn fs-btn-danger" data-deactivate="${esc(row.fellowship_code)}">Deactivate</button>` : ""}
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadFellowships() {
+      $("rows").innerHTML = '<tr><td colspan="7" class="fs-table-loading">Loading fellowships...</td></tr>';
+      const { data, error } = await supabase
+        .from("fellowship_map")
+        .select("fellowship_code,campus_name,group_id,subgroup_id,timezone,active,created_at,updated_at")
+        .order("fellowship_code", { ascending: true });
+      if (error) {
+        $("rows").innerHTML = `<tr><td colspan="7" class="fs-table-empty">Failed to load: ${esc(error.message)}</td></tr>`;
+        return;
+      }
+      state.fellowships = data || [];
+      applyFilters();
+    }
+
+    function openModal(mode, row = null) {
+      state.editingCode = row?.fellowship_code || null;
+      $("fellowshipModalTitle").textContent = mode === "edit" ? "Edit Fellowship" : "Add Fellowship";
+      $("fellowshipCodeInput").value = row?.fellowship_code || "";
+      $("fellowshipCodeInput").readOnly = mode === "edit";
+      $("campusNameInput").value = row?.campus_name || "";
+      $("groupInput").value = row?.group_id || "";
+      setSubgroupOptions($("groupInput").value, "subgroupInput", row?.subgroup_id || "");
+      $("timezoneInput").value = row?.timezone || "America/Toronto";
+      $("activeInput").checked = row?.active !== false;
+      $("fellowshipModalOverlay").classList.add("open");
+    }
+
+    function closeModal() {
+      $("fellowshipModalOverlay").classList.remove("open");
+      $("fellowshipForm").reset();
+      setSubgroupOptions("", "subgroupInput");
+      state.editingCode = null;
+    }
+
+    async function writeAudit(action, entityId, details) {
+      await supabase.from("audit_logs").insert({
+        actor_email: state.auth?.profile?.email || null,
+        action,
+        entity_type: "fellowship_map",
+        entity_id: entityId,
+        status: "SUCCESS",
+        details,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    async function saveFellowship() {
+      const fellowship_code = $("fellowshipCodeInput").value.trim().toUpperCase();
+      const campus_name = $("campusNameInput").value.trim();
+      const group_id = $("groupInput").value;
+      const subgroup_id = $("subgroupInput").value;
+      const timezone = $("timezoneInput").value;
+      const active = $("activeInput").checked;
+
+      $("fellowshipCodeInput").value = fellowship_code;
+      if (!fellowship_code || !campus_name || !group_id || !subgroup_id || !timezone) {
+        notify("All required fields must be filled.", "warning");
+        return;
+      }
+
+      if (!state.editingCode) {
+        const exists = state.fellowships.some((f) => String(f.fellowship_code || "").toUpperCase() === fellowship_code);
+        if (exists) {
+          notify("Fellowship code must be unique.", "error");
+          return;
+        }
+      }
+
+      const payload = { fellowship_code, campus_name, group_id, subgroup_id, timezone, active };
+      const { error } = await supabase.from("fellowship_map").upsert(payload, { onConflict: "fellowship_code" });
+      if (error) {
+        notify(`Save failed: ${error.message}`, "error");
+        return;
+      }
+
+      const isEdit = Boolean(state.editingCode);
+      await writeAudit(isEdit ? "FELLOWSHIP_UPDATED" : "FELLOWSHIP_CREATED", fellowship_code, payload);
+      notify(isEdit ? "Fellowship updated." : "Fellowship created.", "success");
+      closeModal();
+      await loadFellowships();
+    }
+
+    async function deactivateFellowship(code) {
+      const target = state.fellowships.find((x) => x.fellowship_code === code);
+      if (!target || target.active === false) return;
+      if (!window.confirm(`Deactivate fellowship ${code}?`)) return;
+      const { error } = await supabase
+        .from("fellowship_map")
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq("fellowship_code", code);
+      if (error) {
+        notify(`Deactivate failed: ${error.message}`, "error");
+        return;
+      }
+      await writeAudit("FELLOWSHIP_UPDATED", code, { active: false });
+      notify("Fellowship deactivated.", "success");
+      await loadFellowships();
+    }
+
+    function bindEvents() {
+      $("searchInput").addEventListener("input", (e) => { state.filters.search = e.target.value || ""; applyFilters(); });
+      $("groupFilter").addEventListener("change", (e) => {
+        state.filters.group = e.target.value || "";
+        state.filters.subgroup = "";
+        setSubgroupOptions(state.filters.group, "subgroupFilter");
+        $("subgroupFilter").value = "";
+        applyFilters();
+      });
+      $("subgroupFilter").addEventListener("change", (e) => { state.filters.subgroup = e.target.value || ""; applyFilters(); });
+      $("activeFilter").addEventListener("change", (e) => { state.filters.active = e.target.value || ""; applyFilters(); });
+      $("refreshBtn").addEventListener("click", loadFellowships);
+      $("addBtn").addEventListener("click", () => openModal("create"));
+      $("groupInput").addEventListener("change", (e) => setSubgroupOptions(e.target.value, "subgroupInput"));
+      $("fellowshipCodeInput").addEventListener("input", (e) => { e.target.value = String(e.target.value || "").toUpperCase(); });
+      $("cancelModalBtn").addEventListener("click", closeModal);
+      $("saveModalBtn").addEventListener("click", saveFellowship);
+      $("fellowshipModalOverlay").addEventListener("click", (e) => { if (e.target === $("fellowshipModalOverlay")) closeModal(); });
+      document.addEventListener("click", (e) => {
+        const editBtn = e.target.closest("[data-edit]");
+        if (editBtn) {
+          const row = state.fellowships.find((f) => f.fellowship_code === editBtn.getAttribute("data-edit"));
+          if (row) openModal("edit", row);
+          return;
+        }
+        const deactivateBtn = e.target.closest("[data-deactivate]");
+        if (deactivateBtn) deactivateFellowship(deactivateBtn.getAttribute("data-deactivate"));
+      });
+    }
+
+    async function init() {
+      const auth = await requireAuth(["admin", "superadmin"]);
+      if (!auth) return;
+      const profile = auth.profile || (await getCurrentProfile());
+      if (!profile || !isAdmin(profile.role)) {
+        window.location.href = "/foundation/auth/login.html";
+        return;
+      }
+      state.auth = { ...auth, profile };
+      window.FSAdminShell?.mount({ active: "fellowships", pageTitle: "Fellowship Management", role: profile.role });
+      setSubgroupOptions("", "subgroupFilter");
+      setSubgroupOptions("", "subgroupInput");
+      bindEvents();
+      await loadFellowships();
+    }
+
+    init().catch((err) => {
+      $("rows").innerHTML = `<tr><td colspan="7" class="fs-table-empty">Failed to initialize: ${esc(err?.message || err)}</td></tr>`;
+    });
+  </script>
+</body>
+</html>

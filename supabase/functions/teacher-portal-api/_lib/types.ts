@@ -16,6 +16,8 @@ export interface TeacherContext {
 export interface AuthContext {
   user: { id: string; email?: string | null };
   teacher: TeacherContext;
+  role: string;
+  teacherMapped: boolean;
 }
 
 export interface WriteAuditInput {

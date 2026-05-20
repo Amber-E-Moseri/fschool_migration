@@ -61,6 +61,11 @@ export const supabase = createClient(
   },
 );
 
+// Backward compatibility for legacy scripts (e.g. api-client.js) that still read window.supabase.
+if (typeof window !== "undefined") {
+  window.supabase = supabase;
+}
+
 // Canonical landing URLs (relative to /foundation).
 export const TEACHER_LANDING_PATH = "teacher/index.html";
 export const ADMIN_LANDING_PATH = "staff/admin-dashboard.html";

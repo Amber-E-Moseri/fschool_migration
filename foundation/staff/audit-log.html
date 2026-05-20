@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -20,14 +20,14 @@
     .table-wrap { overflow: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 980px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: var(--surface-2); }
+    th { color: var(--color-text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: var(--surface-2); }
     .chip { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid var(--border); }
     .chip.ok { background: var(--success-soft); color: #1b6b3d; }
     .chip.warn { background: #fff4db; color: #8a5600; }
     .chip.bad { background: var(--danger-soft); color: #a33131; }
     .chip.info { background: var(--soft-lavender); color: var(--primary); }
-    .details { color: var(--muted); max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .state { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); }
+    .details { color: var(--color-text-muted); max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .state { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--color-text-muted); }
   </style>
 </head>
 <body>
@@ -76,7 +76,7 @@
 
   <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
-  <script src="../js/admin-shell.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
     import { supabase, getCurrentProfile, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
 
@@ -218,7 +218,7 @@
             <td>${actor}</td>
             <td>${entity}</td>
             <td>${entityId}</td>
-            <td><span class="chip ${chipClass(status)}">${status}</span></td>
+            <td><span class="fs-badge ${chipClass(status)}">${status}</span></td>
             <td class="details" title="${detailsText}">${detailsText}</td>
           </tr>
         `;
@@ -256,7 +256,7 @@
         title: "Rock Solid Admin",
         profileName: profile.full_name || profile.email || "Admin",
         role: profile.role,
-        breadcrumbs: [{ label: "Admin", href: "admin-dashboard.html" }, "Audit Logs"],
+        breadcrumbs: [{ label: "Admin", href: "dashboards.html" }, "Audit Logs"],
       });
 
       wireEvents();
@@ -270,6 +270,9 @@
   </script>
 </body>
 </html>
+
+
+
 
 
 
